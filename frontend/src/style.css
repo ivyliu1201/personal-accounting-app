@@ -86,8 +86,16 @@ h2 {
   font-size: 18px;
 }
 
-.entry-table {
+.entry-table,
+.entry-list {
   display: grid;
+  gap: 8px;
+}
+
+.entry-card {
+  align-items: start;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
 }
 
@@ -104,12 +112,20 @@ h2 {
 }
 
 .entry-row input,
-.entry-row select {
+.entry-row select,
+.entry-card input,
+.entry-card select {
   width: 100%;
   min-width: 0;
   border: 1px solid #cbd2d9;
   border-radius: 6px;
   padding: 8px;
+}
+
+.category-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
 .icon-button {
