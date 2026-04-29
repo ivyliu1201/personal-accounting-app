@@ -5,7 +5,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +19,8 @@ public class TransactionService {
 
     private static final int DEFAULT_RECENT_LIMIT = 5;
     private static final int MAX_RECENT_LIMIT = 15;
+    private static final int SUMMARY_RANGE_DAYS = 30;
+    private static final BigDecimal PERCENTAGE_MULTIPLIER = BigDecimal.valueOf(100);
 
     private final CurrentUserProvider currentUserProvider;
     private final CategoryRepository categoryRepository;
@@ -54,6 +59,37 @@ public class TransactionService {
         String userId = currentUserProvider.getCurrentUserId();
         int limit = normalizeRecentLimit(requestedLimit);
         return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
+    }
+
+    /**
+     * 查詢首頁近 30 天類別摘要。
+     *
+     * 輸入：收入或支出類型。
+     * 輸出：依金額由大到小排序的類別摘要清單。
+     * 可能錯誤：資料庫查詢失敗時拋出資料存取例外。
+     */
+    @Transactional(readOnly = true)
+    public List<CategorySummaryResponse> listCategorySummaries(TransactionType type) {
+        String userId = currentUserProvider.getCurrentUserId();
+        LocalDate endDate = LocalDate.now(clock);
+        LocalDate startDate = endDate.minusDays(SUMMARY_RANGE_DAYS - 1L);
+        List<CategorySummaryProjection> summaries = transactionRepository.listCategorySummaries(
+                userId,
+                type,
+                startDate,
+                endDate
+        );
+        BigDecimal totalAmount = summaries.stream()
+                .map(CategorySummaryProjection::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return summaries.stream()
+                .map(summary -> new CategorySummaryResponse(
+                        summary.getCategoryName(),
+                        summary.getAmount(),
+                        calculatePercentage(summary.getAmount(), totalAmount)
+                ))
+                .toList();
     }
 
     private Category getOrCreateCategory(String userId, CreateTransactionRequest request, OffsetDateTime now) {
@@ -106,5 +142,20 @@ public class TransactionService {
             return DEFAULT_RECENT_LIMIT;
         }
         return Math.min(requestedLimit, MAX_RECENT_LIMIT);
+    }
+
+    /**
+     * 計算類別金額占總金額的百分比。
+     *
+     * 輸入：類別金額與總金額。
+     * 輸出：四捨五入到小數二位的百分比。
+     * 可能錯誤：無，總金額為零時回傳零。
+     */
+    private BigDecimal calculatePercentage(BigDecimal amount, BigDecimal totalAmount) {
+        if (BigDecimal.ZERO.compareTo(totalAmount) == 0) {
+            return BigDecimal.ZERO;
+        }
+        return amount.multiply(PERCENTAGE_MULTIPLIER)
+                .divide(totalAmount, 2, RoundingMode.HALF_UP);
     }
 }

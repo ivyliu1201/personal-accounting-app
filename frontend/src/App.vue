@@ -78,11 +78,45 @@
           <div class="panel-header">
             <h2>類別摘要</h2>
             <div class="segmented">
-              <button type="button" @click="showUnavailable">支出類別</button>
-              <button type="button" @click="showUnavailable">收入類別</button>
+              <button
+                type="button"
+                :class="{ active: summaryType === 'EXPENSE' }"
+                @click="setSummaryType('EXPENSE')"
+              >
+                支出類別
+              </button>
+              <button
+                type="button"
+                :class="{ active: summaryType === 'INCOME' }"
+                @click="setSummaryType('INCOME')"
+              >
+                收入類別
+              </button>
             </div>
           </div>
-          <div class="empty-chart">尚未建立圖表資料</div>
+          <div class="empty-chart">甜甜圈圖待實作</div>
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>類別</th>
+                <th>金額</th>
+                <th>占比</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="isLoadingSummary">
+                <td colspan="3">載入中</td>
+              </tr>
+              <tr v-else-if="categorySummaries.length === 0">
+                <td colspan="3">近 30 天沒有資料</td>
+              </tr>
+              <tr v-for="summary in categorySummaries" v-else :key="summary.categoryName">
+                <td>{{ summary.categoryName }}</td>
+                <td>{{ formatAmount(summary.amount) }}</td>
+                <td>{{ formatPercentage(summary.percentage) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <section class="details-panel">
@@ -157,6 +191,12 @@ interface TransactionResponse {
   createdAt: string;
 }
 
+interface CategorySummaryResponse {
+  categoryName: string;
+  amount: number;
+  percentage: number;
+}
+
 const expenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長', '社交', '治裝費', '運動'];
 const incomeCategories = ['投資', '薪資'];
 const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
@@ -165,9 +205,12 @@ const today = new Date().toISOString().slice(0, 10);
 let rowId = 1;
 const rows = ref<EntryRow[]>([createRow()]);
 const recentTransactions = ref<TransactionResponse[]>([]);
+const categorySummaries = ref<CategorySummaryResponse[]>([]);
 const recentLimit = ref(5);
+const summaryType = ref<TransactionType>('EXPENSE');
 const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
+const isLoadingSummary = ref(false);
 const message = ref('');
 
 const canSubmit = computed(() => rows.value.every((row) => {
@@ -177,6 +220,7 @@ const canSubmit = computed(() => rows.value.every((row) => {
 
 onMounted(() => {
   void loadRecent();
+  void loadCategorySummary();
 });
 
 function createRow(): EntryRow {
@@ -255,12 +299,17 @@ async function submitBatch() {
 
     rows.value = [createRow()];
     showMessage('新增成功');
-    await loadRecent();
+    await Promise.all([loadRecent(), loadCategorySummary()]);
   } catch (error) {
     showMessage(error instanceof Error ? error.message : '新增失敗');
   } finally {
     isSubmitting.value = false;
   }
+}
+
+function setSummaryType(type: TransactionType) {
+  summaryType.value = type;
+  void loadCategorySummary();
 }
 
 async function loadRecent() {
@@ -278,6 +327,21 @@ async function loadRecent() {
   }
 }
 
+async function loadCategorySummary() {
+  isLoadingSummary.value = true;
+  try {
+    const response = await fetch(`/api/transactions/category-summary?type=${summaryType.value}`);
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response));
+    }
+    categorySummaries.value = await response.json() as CategorySummaryResponse[];
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '類別摘要載入失敗');
+  } finally {
+    isLoadingSummary.value = false;
+  }
+}
+
 async function getErrorMessage(response: Response) {
   const text = await response.text();
   return text || `HTTP ${response.status}`;
@@ -289,6 +353,13 @@ function typeLabel(type: TransactionType) {
 
 function formatAmount(amount: number) {
   return new Intl.NumberFormat('zh-TW').format(amount);
+}
+
+function formatPercentage(percentage: number) {
+  return `${new Intl.NumberFormat('zh-TW', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0
+  }).format(percentage)}%`;
 }
 
 function formatDateTime(value: string) {

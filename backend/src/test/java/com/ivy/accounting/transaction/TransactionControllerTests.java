@@ -3,11 +3,18 @@ package com.ivy.accounting.transaction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -85,14 +92,42 @@ class TransactionControllerTests {
 
     @Test
     void listRecentReturnsRequestedLimit() throws Exception {
-        createExpense("2026-04-27", 80, "飲食", "第一筆");
-        createExpense("2026-04-28", 90, "交通", "第二筆");
-        createExpense("2026-04-29", 100, "運動", "第三筆");
+        createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "第一筆");
+        createTransaction("EXPENSE", "2026-04-28", 90, "交通", "第二筆");
+        createTransaction("EXPENSE", "2026-04-29", 100, "運動", "第三筆");
 
         mockMvc.perform(get("/api/transactions/recent")
                         .param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void listCategorySummariesReturnsRecentThirtyDayTotalsAndPercentages() throws Exception {
+        createTransaction("EXPENSE", "2026-04-29", 100, "飲食", "午餐");
+        createTransaction("EXPENSE", "2026-04-28", 50, "飲食", "早餐");
+        createTransaction("EXPENSE", "2026-04-27", 50, "交通", "捷運");
+        createTransaction("EXPENSE", "2026-03-30", 999, "運動", "區間外");
+        createTransaction("INCOME", "2026-04-29", 1000, "薪資", "薪水");
+
+        mockMvc.perform(get("/api/transactions/category-summary")
+                        .param("type", "EXPENSE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].categoryName").value("飲食"))
+                .andExpect(jsonPath("$[0].amount").value(150))
+                .andExpect(jsonPath("$[0].percentage").value(75.0))
+                .andExpect(jsonPath("$[1].categoryName").value("交通"))
+                .andExpect(jsonPath("$[1].amount").value(50))
+                .andExpect(jsonPath("$[1].percentage").value(25.0));
+
+        mockMvc.perform(get("/api/transactions/category-summary")
+                        .param("type", "INCOME"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].categoryName").value("薪資"))
+                .andExpect(jsonPath("$[0].amount").value(1000))
+                .andExpect(jsonPath("$[0].percentage").value(100.0));
     }
 
     @Test
@@ -126,12 +161,18 @@ class TransactionControllerTests {
      * 輸出：無，成功後資料會寫入測試資料庫。
      * 可能錯誤：API 驗證或持久化失敗時拋出測試例外。
      */
-    private void createExpense(String transactionDate, int amount, String categoryName, String note) throws Exception {
+    private void createTransaction(
+            String type,
+            String transactionDate,
+            int amount,
+            String categoryName,
+            String note
+    ) throws Exception {
         String requestBody = """
                 {
                   "transactions": [
                     {
-                      "type": "EXPENSE",
+                      "type": "%s",
                       "transactionDate": "%s",
                       "amount": %d,
                       "categoryName": "%s",
@@ -139,11 +180,21 @@ class TransactionControllerTests {
                     }
                   ]
                 }
-                """.formatted(transactionDate, amount, categoryName, note);
+                """.formatted(type, transactionDate, amount, categoryName, note);
 
         mockMvc.perform(post("/api/transactions/batch")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isOk());
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(Instant.parse("2026-04-29T00:00:00Z"), ZoneId.of("Asia/Taipei"));
+        }
     }
 }

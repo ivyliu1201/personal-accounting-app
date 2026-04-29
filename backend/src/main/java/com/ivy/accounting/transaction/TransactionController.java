@@ -36,4 +36,18 @@ public class TransactionController {
                 .map(TransactionResponse::from)
                 .toList();
     }
+
+    /**
+     * 查詢首頁近 30 天類別摘要。
+     *
+     * 輸入：收入或支出類型，未指定時預設支出。
+     * 輸出：類別、金額與占比清單。
+     * 可能錯誤：type 不是合法列舉值時回傳請求錯誤。
+     */
+    @GetMapping("/category-summary")
+    public List<CategorySummaryResponse> listCategorySummaries(
+            @RequestParam(defaultValue = "EXPENSE") TransactionType type
+    ) {
+        return transactionService.listCategorySummaries(type);
+    }
 }

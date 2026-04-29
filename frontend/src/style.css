@@ -33,6 +33,12 @@ button:hover {
   background: #f0f4f8;
 }
 
+button.active {
+  border-color: #3273dc;
+  background: #e8f1ff;
+  color: #1f4f99;
+}
+
 .app-shell {
   min-height: 100vh;
 }
@@ -159,6 +165,7 @@ h2 {
   border: 1px dashed #bcccdc;
   border-radius: 8px;
   color: #627d98;
+  margin-bottom: 12px;
 }
 
 table {
@@ -186,6 +193,10 @@ td {
 
 .details-panel {
   overflow-x: auto;
+}
+
+.summary-table {
+  margin-bottom: 0;
 }
 
 .message {
