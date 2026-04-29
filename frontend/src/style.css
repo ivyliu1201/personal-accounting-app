@@ -1,0 +1,148 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f6f7f9;
+  color: #1f2933;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+  padding: 8px 12px;
+}
+
+button:hover {
+  background: #f0f4f8;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid #d9e2ec;
+  background: #ffffff;
+}
+
+.nav-links {
+  display: flex;
+  gap: 8px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.entry-panel,
+.chart-panel,
+.details-panel {
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.summary-panel {
+  display: grid;
+  gap: 16px;
+}
+
+h1,
+h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+.entry-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.entry-row input,
+.entry-row select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.actions,
+.panel-header,
+.segmented {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions {
+  margin-top: 16px;
+}
+
+.panel-header {
+  justify-content: space-between;
+}
+
+.empty-chart {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  border: 1px dashed #bcccdc;
+  border-radius: 8px;
+  color: #627d98;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e4e7eb;
+  padding: 10px 8px;
+  text-align: left;
+}
+
+.message {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  border-radius: 6px;
+  background: #1f2933;
+  color: #ffffff;
+  padding: 10px 14px;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-row {
+    grid-template-columns: 1fr;
+  }
+}
