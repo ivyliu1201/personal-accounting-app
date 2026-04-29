@@ -23,6 +23,11 @@ button {
   padding: 8px 12px;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 button:hover {
   background: #f0f4f8;
 }
@@ -42,8 +47,16 @@ button:hover {
 }
 
 .nav-links {
+  align-items: center;
   display: flex;
   gap: 8px;
+}
+
+.user-pill {
+  border: 1px solid #cbd2d9;
+  border-radius: 999px;
+  color: #52606d;
+  padding: 7px 12px;
 }
 
 .workspace {
@@ -73,10 +86,21 @@ h2 {
   font-size: 18px;
 }
 
-.entry-row {
+.entry-table {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
+}
+
+.entry-row {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(90px, 0.75fr) minmax(140px, 1fr) minmax(100px, 0.8fr) minmax(130px, 1fr) minmax(160px, 1.2fr) 36px;
+  gap: 8px;
+}
+
+.entry-head {
+  color: #52606d;
+  font-size: 13px;
 }
 
 .entry-row input,
@@ -86,6 +110,12 @@ h2 {
   border: 1px solid #cbd2d9;
   border-radius: 6px;
   padding: 8px;
+}
+
+.icon-button {
+  height: 36px;
+  padding: 0;
+  width: 36px;
 }
 
 .actions,
@@ -126,6 +156,13 @@ td {
   text-align: left;
 }
 
+.truncate {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .message {
   position: fixed;
   right: 16px;
@@ -144,5 +181,9 @@ td {
 
   .entry-row {
     grid-template-columns: 1fr;
+  }
+
+  .entry-head {
+    display: none;
   }
 }

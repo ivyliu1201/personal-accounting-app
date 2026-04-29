@@ -1,6 +1,7 @@
 package com.ivy.accounting.transaction;
 
 import com.ivy.accounting.auth.CurrentUserProvider;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,23 +43,34 @@ public class TransactionService {
         for (CreateTransactionRequest transactionRequest : request.transactions()) {
             Category category = getOrCreateCategory(userId, transactionRequest, now);
             AccountingTransaction transaction = buildTransaction(userId, transactionRequest, category, now);
-            transactionRepository.create(transaction);
-            createdTransactions.add(transaction);
+            createdTransactions.add(transactionRepository.save(transaction));
         }
 
         return createdTransactions;
     }
 
+    @Transactional(readOnly = true)
     public List<AccountingTransaction> listRecent(Integer requestedLimit) {
         String userId = currentUserProvider.getCurrentUserId();
         int limit = normalizeRecentLimit(requestedLimit);
-        return transactionRepository.listRecent(userId, limit);
+        return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
     }
 
     private Category getOrCreateCategory(String userId, CreateTransactionRequest request, OffsetDateTime now) {
         String categoryName = request.categoryName().trim();
         return categoryRepository.getVisibleCategory(userId, request.type(), categoryName)
-                .orElseGet(() -> categoryRepository.createCustomCategory(userId, request.type(), categoryName, now));
+                .orElseGet(() -> categoryRepository.save(buildCustomCategory(userId, request.type(), categoryName, now)));
+    }
+
+    private Category buildCustomCategory(String userId, TransactionType type, String name, OffsetDateTime now) {
+        Category category = new Category();
+        category.setId(UUID.randomUUID());
+        category.setUserId(userId);
+        category.setType(type);
+        category.setName(name);
+        category.setDefaultCategory(false);
+        category.setCreatedAt(now);
+        return category;
     }
 
     private AccountingTransaction buildTransaction(
@@ -73,8 +85,7 @@ public class TransactionService {
         transaction.setType(request.type());
         transaction.setTransactionDate(request.transactionDate());
         transaction.setAmount(request.amount());
-        transaction.setCategoryId(category.getId());
-        transaction.setCategoryName(category.getName());
+        transaction.setCategory(category);
         transaction.setNote(normalizeNote(request.note()));
         transaction.setCreatedAt(now);
         return transaction;

@@ -1,7 +1,7 @@
 package com.ivy.accounting.config;
 
 import org.flywaydb.core.Flyway;
-import org.springframework.boot.ApplicationRunner;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,11 +11,15 @@ import javax.sql.DataSource;
 public class FlywayConfig {
 
     @Bean
-    ApplicationRunner flywayMigrationRunner(DataSource dataSource) {
-        return args -> Flyway.configure()
+    Flyway flyway(DataSource dataSource) {
+        return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
-                .load()
-                .migrate();
+                .load();
+    }
+
+    @Bean
+    SmartInitializingSingleton flywayMigrationInitializer(Flyway flyway) {
+        return flyway::migrate;
     }
 }

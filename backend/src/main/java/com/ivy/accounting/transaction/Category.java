@@ -1,15 +1,36 @@
 package com.ivy.accounting.transaction;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+@Entity
+@Table(name = "categories")
 public class Category {
 
+    @Id
     private UUID id;
+
+    @Column(name = "user_id")
     private String userId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private TransactionType type;
+
+    @Column(nullable = false)
     private String name;
+
+    @Column(name = "default_category", nullable = false)
     private boolean defaultCategory;
+
+    @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     public UUID getId() {

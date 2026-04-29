@@ -20,7 +20,7 @@ public record TransactionResponse(
                 transaction.getType(),
                 transaction.getTransactionDate(),
                 transaction.getAmount(),
-                transaction.getCategoryName(),
+                transaction.getCategory().getName(),
                 transaction.getNote(),
                 transaction.getCreatedAt()
         );

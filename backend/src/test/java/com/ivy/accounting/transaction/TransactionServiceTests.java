@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,12 +18,17 @@ class TransactionServiceTests {
     private TransactionService transactionService;
 
     @Autowired
-    private JdbcClient jdbcClient;
+    private AccountingTransactionRepository transactionRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     @BeforeEach
     void setUp() {
-        jdbcClient.sql("delete from accounting_transactions").update();
-        jdbcClient.sql("delete from categories where default_category = false").update();
+        transactionRepository.deleteAll();
+        categoryRepository.deleteAll(categoryRepository.findAll().stream()
+                .filter(category -> !category.isDefaultCategory())
+                .toList());
     }
 
     @Test
@@ -50,12 +54,12 @@ class TransactionServiceTests {
         List<AccountingTransaction> recentTransactions = transactionService.listRecent(null);
 
         assertThat(createdTransactions).hasSize(2);
-        assertThat(createdTransactions).extracting(AccountingTransaction::getCategoryName)
+        assertThat(createdTransactions).extracting(transaction -> transaction.getCategory().getName())
                 .containsExactly("飲食", "副業");
         assertThat(recentTransactions).hasSize(2);
         assertThat(recentTransactions).extracting(AccountingTransaction::getUserId)
                 .containsOnly("dev-user");
-        assertThat(recentTransactions).extracting(AccountingTransaction::getCategoryName)
+        assertThat(recentTransactions).extracting(transaction -> transaction.getCategory().getName())
                 .containsExactly("飲食", "副業");
     }
 
