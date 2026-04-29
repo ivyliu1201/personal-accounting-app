@@ -1,0 +1,149 @@
+package com.ivy.accounting.transaction;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * 交易 API 整合測試，驗證首頁批次新增與最近明細 API 的 HTTP 行為。
+ */
+@SpringBootTest
+class TransactionControllerTests {
+
+    private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private AccountingTransactionRepository transactionRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        transactionRepository.deleteAll();
+        categoryRepository.deleteAll(categoryRepository.findAll().stream()
+                .filter(category -> !category.isDefaultCategory())
+                .toList());
+    }
+
+    @Test
+    void createBatchReturnsCreatedTransactionsAndPersistsCustomCategory() throws Exception {
+        String requestBody = """
+                {
+                  "transactions": [
+                    {
+                      "type": "EXPENSE",
+                      "transactionDate": "2026-04-29",
+                      "amount": 120,
+                      "categoryName": "飲食",
+                      "note": "午餐"
+                    },
+                    {
+                      "type": "INCOME",
+                      "transactionDate": "2026-04-29",
+                      "amount": 3000,
+                      "categoryName": "副業",
+                      "note": "兼職"
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/transactions/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactions.length()").value(2))
+                .andExpect(jsonPath("$.transactions[0].type").value("EXPENSE"))
+                .andExpect(jsonPath("$.transactions[0].categoryName").value("飲食"))
+                .andExpect(jsonPath("$.transactions[0].note").value("午餐"))
+                .andExpect(jsonPath("$.transactions[1].type").value("INCOME"))
+                .andExpect(jsonPath("$.transactions[1].categoryName").value("副業"));
+
+        assertThat(transactionRepository.findAll()).hasSize(2);
+        assertThat(categoryRepository.findAll()).anySatisfy(category -> {
+            assertThat(category.getName()).isEqualTo("副業");
+            assertThat(category.getUserId()).isEqualTo("dev-user");
+            assertThat(category.isDefaultCategory()).isFalse();
+        });
+    }
+
+    @Test
+    void listRecentReturnsRequestedLimit() throws Exception {
+        createExpense("2026-04-27", 80, "飲食", "第一筆");
+        createExpense("2026-04-28", 90, "交通", "第二筆");
+        createExpense("2026-04-29", 100, "運動", "第三筆");
+
+        mockMvc.perform(get("/api/transactions/recent")
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void createBatchRejectsInvalidRequiredFields() throws Exception {
+        String requestBody = """
+                {
+                  "transactions": [
+                    {
+                      "type": "EXPENSE",
+                      "transactionDate": "2999-01-01",
+                      "amount": 0,
+                      "categoryName": "",
+                      "note": "invalid"
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/transactions/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+
+        assertThat(transactionRepository.findAll()).isEmpty();
+    }
+
+    /**
+     * 透過 API 建立支出資料，讓最近明細測試不直接依賴 Service 實作細節。
+     *
+     * 輸入：日期、金額、類別與備註。
+     * 輸出：無，成功後資料會寫入測試資料庫。
+     * 可能錯誤：API 驗證或持久化失敗時拋出測試例外。
+     */
+    private void createExpense(String transactionDate, int amount, String categoryName, String note) throws Exception {
+        String requestBody = """
+                {
+                  "transactions": [
+                    {
+                      "type": "EXPENSE",
+                      "transactionDate": "%s",
+                      "amount": %d,
+                      "categoryName": "%s",
+                      "note": "%s"
+                    }
+                  ]
+                }
+                """.formatted(transactionDate, amount, categoryName, note);
+
+        mockMvc.perform(post("/api/transactions/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk());
+    }
+}
