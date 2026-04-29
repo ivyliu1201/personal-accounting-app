@@ -7,6 +7,7 @@ body {
   background: #f6f7f9;
   color: #1f2933;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
 }
 
 button,
@@ -20,7 +21,7 @@ button {
   border-radius: 6px;
   background: #ffffff;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 7px 10px;
 }
 
 button:disabled {
@@ -61,7 +62,7 @@ button:hover {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr);
+  grid-template-columns: minmax(720px, 1.2fr) minmax(520px, 0.8fr);
   gap: 16px;
   padding: 16px;
 }
@@ -83,7 +84,7 @@ button:hover {
 h1,
 h2 {
   margin: 0 0 16px;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .entry-table,
@@ -95,7 +96,7 @@ h2 {
 .entry-card {
   align-items: start;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  grid-template-columns: 86px 138px 96px minmax(128px, 1fr) minmax(160px, 1.2fr) 36px;
   gap: 8px;
 }
 
@@ -119,7 +120,7 @@ h2 {
   min-width: 0;
   border: 1px solid #cbd2d9;
   border-radius: 6px;
-  padding: 8px;
+  padding: 7px 8px;
 }
 
 .category-field {
@@ -143,6 +144,7 @@ h2 {
 }
 
 .actions {
+  justify-content: center;
   margin-top: 16px;
 }
 
@@ -163,20 +165,27 @@ table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 12px;
+  table-layout: auto;
 }
 
 th,
 td {
   border-bottom: 1px solid #e4e7eb;
-  padding: 10px 8px;
+  font-size: 13px;
+  padding: 8px 6px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .truncate {
-  max-width: 180px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.details-panel {
+  overflow-x: auto;
 }
 
 .message {
@@ -195,11 +204,21 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .entry-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .entry-row {
     grid-template-columns: 1fr;
   }
 
   .entry-head {
     display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .entry-card {
+    grid-template-columns: 1fr;
   }
 }
