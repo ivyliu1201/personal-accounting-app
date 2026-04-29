@@ -147,13 +147,13 @@ const expenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長
 const incomeCategories = ['投資', '薪資'];
 
 const today = new Date().toISOString().slice(0, 10);
+let rowId = 1;
 const rows = ref<EntryRow[]>([createRow()]);
 const recentTransactions = ref<TransactionResponse[]>([]);
 const recentLimit = ref(5);
 const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
 const message = ref('');
-let rowId = 1;
 
 const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
