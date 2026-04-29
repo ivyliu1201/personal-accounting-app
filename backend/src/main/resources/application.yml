@@ -2,7 +2,7 @@ spring:
   application:
     name: personal-accounting-backend
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/personal_accounting}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:15432/personal_accounting}
     username: ${SPRING_DATASOURCE_USERNAME:personal_accounting}
     password: ${SPRING_DATASOURCE_PASSWORD:change_me}
   flyway:
@@ -18,6 +18,11 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 app:
   auth:
