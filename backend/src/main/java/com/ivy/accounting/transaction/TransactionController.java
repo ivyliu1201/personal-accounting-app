@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -35,6 +36,24 @@ public class TransactionController {
                 .stream()
                 .map(TransactionResponse::from)
                 .toList();
+    }
+
+    /**
+     * 查詢歷史查看頁的日期區間明細。
+     *
+     * 輸入：收支類型、起訖日期、頁碼與每頁筆數。
+     * 輸出：符合條件的明細清單與下一頁狀態。
+     * 可能錯誤：日期格式或 type 不合法時回傳請求錯誤。
+     */
+    @GetMapping("/history")
+    public HistoryTransactionsResponse listHistory(
+            @RequestParam(defaultValue = "EXPENSE") TransactionType type,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
+        return transactionService.listHistory(type, startDate, endDate, page, size);
     }
 
     /**

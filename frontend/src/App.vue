@@ -3,13 +3,13 @@
     <nav class="top-bar" aria-label="主要導覽">
       <strong>個人記帳系統</strong>
       <div class="nav-links">
-        <button type="button">首頁</button>
-        <button type="button" @click="showUnavailable">歷史查看</button>
+        <button type="button" :class="{ active: currentView === 'home' }" @click="showHome">首頁</button>
+        <button type="button" :class="{ active: currentView === 'history' }" @click="showHistory">歷史查看</button>
         <span class="user-pill">dev-user</span>
       </div>
     </nav>
 
-    <section class="workspace" aria-label="首頁">
+    <section v-if="currentView === 'home'" class="workspace" aria-label="首頁">
       <section class="entry-panel" aria-label="批次新增區">
         <h1>批次新增區</h1>
 
@@ -184,8 +184,64 @@
               </tr>
             </tbody>
           </table>
-          <button type="button" @click="showUnavailable">查看更多</button>
+          <button type="button" @click="showHistory">查看更多</button>
         </section>
+      </section>
+    </section>
+
+    <section v-else class="history-workspace" aria-label="歷史查看">
+      <section class="history-panel">
+        <div class="panel-header history-header">
+          <h1>歷史查看</h1>
+          <div class="history-controls">
+            <select v-model="historyType" aria-label="收入或支出" @change="resetHistoryPageAndLoad">
+              <option value="EXPENSE">支出</option>
+              <option value="INCOME">收入</option>
+            </select>
+            <input v-model="historyStartDate" type="date" :max="today" aria-label="開始日期" @change="resetHistoryPageAndLoad" />
+            <input v-model="historyEndDate" type="date" :max="today" aria-label="結束日期" @change="resetHistoryPageAndLoad" />
+            <select v-model.number="historySize" aria-label="每頁筆數" @change="resetHistoryPageAndLoad">
+              <option :value="10">10 筆</option>
+              <option :value="15">15 筆</option>
+              <option :value="20">20 筆</option>
+            </select>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>收支</th>
+              <th>類別</th>
+              <th>金額</th>
+              <th>備註</th>
+              <th>建立日期</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="isLoadingHistory">
+              <td colspan="6">載入中</td>
+            </tr>
+            <tr v-else-if="historyTransactions.length === 0">
+              <td colspan="6">此區間沒有資料</td>
+            </tr>
+            <tr v-for="transaction in historyTransactions" v-else :key="transaction.id">
+              <td>{{ transaction.transactionDate }}</td>
+              <td>{{ typeLabel(transaction.type) }}</td>
+              <td>{{ transaction.categoryName }}</td>
+              <td>{{ formatAmount(transaction.amount) }}</td>
+              <td class="truncate">{{ truncateNote(transaction.note) }}</td>
+              <td>{{ formatDateTime(transaction.createdAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="pager">
+          <button type="button" :disabled="historyPage === 0 || isLoadingHistory" @click="previousHistoryPage">上一頁</button>
+          <span>第 {{ historyPage + 1 }} 頁</span>
+          <button type="button" :disabled="!historyHasNext || isLoadingHistory" @click="nextHistoryPage">下一頁</button>
+        </div>
       </section>
     </section>
 
@@ -224,6 +280,13 @@ interface CategorySummaryResponse {
   percentage: number;
 }
 
+interface HistoryTransactionsResponse {
+  transactions: TransactionResponse[];
+  page: number;
+  size: number;
+  hasNext: boolean;
+}
+
 interface DonutSegment {
   categoryName: string;
   amount: number;
@@ -241,14 +304,24 @@ const donutCircumference = 2 * Math.PI * DONUT_RADIUS;
 const chartColors = ['#3273dc', '#1f9d55', '#d97706', '#8b5cf6', '#dc2626', '#0891b2', '#4b5563', '#be185d'];
 
 const today = new Date().toISOString().slice(0, 10);
+const defaultHistoryStartDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 let rowId = 1;
 const rows = ref<EntryRow[]>([createRow()]);
+const currentView = ref<'home' | 'history'>('home');
 const recentTransactions = ref<TransactionResponse[]>([]);
+const historyTransactions = ref<TransactionResponse[]>([]);
 const categorySummaries = ref<CategorySummaryResponse[]>([]);
 const recentLimit = ref(5);
+const historyType = ref<TransactionType>('EXPENSE');
+const historyStartDate = ref(defaultHistoryStartDate);
+const historyEndDate = ref(today);
+const historyPage = ref(0);
+const historySize = ref(10);
+const historyHasNext = ref(false);
 const summaryType = ref<TransactionType>('EXPENSE');
 const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
+const isLoadingHistory = ref(false);
 const isLoadingSummary = ref(false);
 const message = ref('');
 
@@ -370,6 +443,15 @@ function setSummaryType(type: TransactionType) {
   void loadCategorySummary();
 }
 
+function showHome() {
+  currentView.value = 'home';
+}
+
+function showHistory() {
+  currentView.value = 'history';
+  void loadHistory();
+}
+
 async function loadRecent() {
   isLoadingRecent.value = true;
   try {
@@ -382,6 +464,58 @@ async function loadRecent() {
     showMessage(error instanceof Error ? error.message : '最近明細載入失敗');
   } finally {
     isLoadingRecent.value = false;
+  }
+}
+
+async function resetHistoryPageAndLoad() {
+  historyPage.value = 0;
+  await loadHistory();
+}
+
+async function previousHistoryPage() {
+  if (historyPage.value === 0) {
+    return;
+  }
+  historyPage.value -= 1;
+  await loadHistory();
+}
+
+async function nextHistoryPage() {
+  if (!historyHasNext.value) {
+    return;
+  }
+  historyPage.value += 1;
+  await loadHistory();
+}
+
+async function loadHistory() {
+  if (historyStartDate.value > historyEndDate.value) {
+    showMessage('開始日期不可晚於結束日期');
+    return;
+  }
+
+  isLoadingHistory.value = true;
+  try {
+    const params = new URLSearchParams({
+      type: historyType.value,
+      startDate: historyStartDate.value,
+      endDate: historyEndDate.value,
+      page: String(historyPage.value),
+      size: String(historySize.value)
+    });
+    const response = await fetch(`/api/transactions/history?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response));
+    }
+    const data = await response.json() as HistoryTransactionsResponse;
+    historyTransactions.value = data.transactions;
+    historyPage.value = data.page;
+    historySize.value = data.size;
+    historyHasNext.value = data.hasNext;
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '歷史明細載入失敗');
+  } finally {
+    isLoadingHistory.value = false;
   }
 }
 
@@ -432,10 +566,6 @@ function truncateNote(note: string | null) {
     return '';
   }
   return note.length > 20 ? `${note.slice(0, 20)}...` : note;
-}
-
-function showUnavailable() {
-  showMessage('此功能尚未完成');
 }
 
 function showMessage(value: string) {

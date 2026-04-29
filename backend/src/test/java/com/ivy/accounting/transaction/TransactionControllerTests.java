@@ -103,6 +103,39 @@ class TransactionControllerTests {
     }
 
     @Test
+    void listHistoryReturnsDateRangeDetailsWithPaginationState() throws Exception {
+        createTransaction("EXPENSE", "2026-04-26", 70, "飲食", "區間外");
+        createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "第一筆");
+        createTransaction("EXPENSE", "2026-04-28", 90, "交通", "第二筆");
+        createTransaction("EXPENSE", "2026-04-29", 100, "運動", "第三筆");
+        createTransaction("INCOME", "2026-04-29", 3000, "薪資", "薪水");
+
+        mockMvc.perform(get("/api/transactions/history")
+                        .param("type", "EXPENSE")
+                        .param("startDate", "2026-04-27")
+                        .param("endDate", "2026-04-29")
+                        .param("page", "0")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactions.length()").value(2))
+                .andExpect(jsonPath("$.transactions[0].transactionDate").value("2026-04-29"))
+                .andExpect(jsonPath("$.transactions[0].categoryName").value("運動"))
+                .andExpect(jsonPath("$.transactions[1].transactionDate").value("2026-04-28"))
+                .andExpect(jsonPath("$.hasNext").value(true));
+
+        mockMvc.perform(get("/api/transactions/history")
+                        .param("type", "EXPENSE")
+                        .param("startDate", "2026-04-27")
+                        .param("endDate", "2026-04-29")
+                        .param("page", "1")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactions.length()").value(1))
+                .andExpect(jsonPath("$.transactions[0].transactionDate").value("2026-04-27"))
+                .andExpect(jsonPath("$.hasNext").value(false));
+    }
+
+    @Test
     void listCategorySummariesReturnsRecentThirtyDayTotalsAndPercentages() throws Exception {
         createTransaction("EXPENSE", "2026-04-29", 100, "飲食", "午餐");
         createTransaction("EXPENSE", "2026-04-28", 50, "飲食", "早餐");

@@ -1,6 +1,7 @@
 package com.ivy.accounting.transaction;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +15,15 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
 
     @EntityGraph(attributePaths = "category")
     List<AccountingTransaction> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "category")
+    Slice<AccountingTransaction> findByUserIdAndTypeAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
+            String userId,
+            TransactionType type,
+            LocalDate startDate,
+            LocalDate endDate,
+            Pageable pageable
+    );
 
     @Query("""
             select t.category.name as categoryName, sum(t.amount) as amount

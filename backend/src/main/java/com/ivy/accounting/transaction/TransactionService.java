@@ -2,6 +2,7 @@ package com.ivy.accounting.transaction;
 
 import com.ivy.accounting.auth.CurrentUserProvider;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,8 @@ public class TransactionService {
     private static final int DEFAULT_RECENT_LIMIT = 5;
     private static final int MAX_RECENT_LIMIT = 15;
     private static final int SUMMARY_RANGE_DAYS = 30;
+    private static final int DEFAULT_HISTORY_SIZE = 10;
+    private static final int MAX_HISTORY_SIZE = 20;
     private static final BigDecimal PERCENTAGE_MULTIPLIER = BigDecimal.valueOf(100);
 
     private final CurrentUserProvider currentUserProvider;
@@ -59,6 +62,40 @@ public class TransactionService {
         String userId = currentUserProvider.getCurrentUserId();
         int limit = normalizeRecentLimit(requestedLimit);
         return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
+    }
+
+    /**
+     * 查詢歷史查看頁的日期區間明細。
+     *
+     * 輸入：收支類型、起訖日期、頁碼與每頁筆數。
+     * 輸出：依交易日期與建立時間倒序排列的明細分頁。
+     * 可能錯誤：日期區間無法由資料庫處理時拋出資料存取例外。
+     */
+    @Transactional(readOnly = true)
+    public HistoryTransactionsResponse listHistory(
+            TransactionType type,
+            LocalDate startDate,
+            LocalDate endDate,
+            Integer requestedPage,
+            Integer requestedSize
+    ) {
+        String userId = currentUserProvider.getCurrentUserId();
+        int page = normalizePage(requestedPage);
+        int size = normalizeHistorySize(requestedSize);
+        Slice<AccountingTransaction> transactions = transactionRepository
+                .findByUserIdAndTypeAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
+                        userId,
+                        type,
+                        startDate,
+                        endDate,
+                        PageRequest.of(page, size)
+                );
+        List<TransactionResponse> responseTransactions = transactions.getContent()
+                .stream()
+                .map(TransactionResponse::from)
+                .toList();
+
+        return new HistoryTransactionsResponse(responseTransactions, page, size, transactions.hasNext());
     }
 
     /**
@@ -142,6 +179,20 @@ public class TransactionService {
             return DEFAULT_RECENT_LIMIT;
         }
         return Math.min(requestedLimit, MAX_RECENT_LIMIT);
+    }
+
+    private int normalizePage(Integer requestedPage) {
+        if (requestedPage == null || requestedPage < 0) {
+            return 0;
+        }
+        return requestedPage;
+    }
+
+    private int normalizeHistorySize(Integer requestedSize) {
+        if (requestedSize == null || requestedSize <= 0) {
+            return DEFAULT_HISTORY_SIZE;
+        }
+        return Math.min(requestedSize, MAX_HISTORY_SIZE);
     }
 
     /**
