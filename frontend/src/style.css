@@ -158,16 +158,6 @@ h2 {
   justify-content: space-between;
 }
 
-.empty-chart {
-  display: grid;
-  min-height: 220px;
-  place-items: center;
-  border: 1px dashed #bcccdc;
-  border-radius: 8px;
-  color: #627d98;
-  margin-bottom: 12px;
-}
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -197,6 +187,61 @@ td {
 
 .summary-table {
   margin-bottom: 0;
+}
+
+.donut-chart {
+  position: relative;
+  display: grid;
+  width: min(220px, 100%);
+  aspect-ratio: 1;
+  place-items: center;
+  margin: 0 auto 12px;
+  color: #627d98;
+}
+
+.donut-chart.empty {
+  min-height: 180px;
+  aspect-ratio: auto;
+  border: 1px dashed #bcccdc;
+  border-radius: 8px;
+}
+
+.donut-chart svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.donut-bg,
+.donut-segment {
+  fill: none;
+  stroke-width: 18;
+}
+
+.donut-bg {
+  stroke: #e4e7eb;
+}
+
+.donut-segment {
+  transition: stroke-dasharray 0.2s ease;
+}
+
+.donut-center {
+  position: absolute;
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  color: #1f2933;
+  text-align: center;
+}
+
+.donut-center span {
+  color: #52606d;
+  font-size: 12px;
+}
+
+.donut-center strong {
+  font-size: 18px;
 }
 
 .message {

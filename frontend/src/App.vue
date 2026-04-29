@@ -94,7 +94,34 @@
               </button>
             </div>
           </div>
-          <div class="empty-chart">甜甜圈圖待實作</div>
+          <div class="donut-chart" :class="{ empty: categorySummaries.length === 0 }" aria-label="類別占比圖">
+            <template v-if="categorySummaries.length > 0">
+              <svg viewBox="0 0 120 120" role="img" aria-label="近 30 天類別占比">
+                <circle class="donut-bg" cx="60" cy="60" r="42" />
+                <circle
+                  v-for="segment in donutSegments"
+                  :key="segment.categoryName"
+                  class="donut-segment"
+                  cx="60"
+                  cy="60"
+                  r="42"
+                  :stroke="segment.color"
+                  :stroke-dasharray="`${segment.length} ${donutCircumference - segment.length}`"
+                  :stroke-dashoffset="segment.offset"
+                >
+                  <title>
+                    {{ typeLabel(summaryType) }} {{ segment.categoryName }} {{ formatAmount(segment.amount) }}
+                    {{ formatPercentage(segment.percentage) }}
+                  </title>
+                </circle>
+              </svg>
+              <div class="donut-center">
+                <span>{{ typeLabel(summaryType) }}</span>
+                <strong>{{ formatAmount(summaryTotal) }}</strong>
+              </div>
+            </template>
+            <span v-else>近 30 天沒有資料</span>
+          </div>
           <table class="summary-table">
             <thead>
               <tr>
@@ -197,9 +224,21 @@ interface CategorySummaryResponse {
   percentage: number;
 }
 
+interface DonutSegment {
+  categoryName: string;
+  amount: number;
+  percentage: number;
+  color: string;
+  length: number;
+  offset: number;
+}
+
 const expenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長', '社交', '治裝費', '運動'];
 const incomeCategories = ['投資', '薪資'];
 const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
+const DONUT_RADIUS = 42;
+const donutCircumference = 2 * Math.PI * DONUT_RADIUS;
+const chartColors = ['#3273dc', '#1f9d55', '#d97706', '#8b5cf6', '#dc2626', '#0891b2', '#4b5563', '#be185d'];
 
 const today = new Date().toISOString().slice(0, 10);
 let rowId = 1;
@@ -217,6 +256,25 @@ const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
   return row.type && row.transactionDate && amount > 0 && getCategoryName(row);
 }));
+
+const summaryTotal = computed(() => categorySummaries.value.reduce((total, summary) => total + summary.amount, 0));
+
+const donutSegments = computed<DonutSegment[]>(() => {
+  let usedLength = 0;
+  return categorySummaries.value.map((summary, index) => {
+    const length = donutCircumference * (summary.percentage / 100);
+    const segment = {
+      categoryName: summary.categoryName,
+      amount: summary.amount,
+      percentage: summary.percentage,
+      color: chartColors[index % chartColors.length],
+      length,
+      offset: -usedLength
+    };
+    usedLength += length;
+    return segment;
+  });
+});
 
 onMounted(() => {
   void loadRecent();
