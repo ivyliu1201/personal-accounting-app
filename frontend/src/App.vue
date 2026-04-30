@@ -16,10 +16,20 @@
         <div class="entry-list">
           <div v-for="(row, index) in rows" :key="row.id" class="entry-card">
             <select v-model="row.type" aria-label="收入或支出" @change="resetCategoryForType(row)">
+              <option value="">未選擇</option>
               <option value="EXPENSE">支出</option>
               <option value="INCOME">收入</option>
             </select>
-            <input v-model="row.transactionDate" type="date" :max="today" aria-label="日期" />
+            <div class="date-field">
+              <input
+                v-model="row.transactionDate"
+                type="date"
+                :max="today"
+                :class="{ empty: !row.transactionDate }"
+                aria-label="日期"
+              />
+              <span v-if="!row.transactionDate" class="date-placeholder">未選擇</span>
+            </div>
             <input
               v-model.trim="row.amount"
               type="text"
@@ -31,10 +41,11 @@
             />
             <div class="category-field">
               <select v-model="row.categoryName" aria-label="類別" @change="resetCustomCategory(row)">
+                <option value="">未選擇</option>
                 <option v-for="category in categoriesByType(row.type)" :key="category" :value="category">
                   {{ category }}
                 </option>
-                <option :value="CUSTOM_CATEGORY_VALUE">自訂類別</option>
+                <option v-if="row.type" :value="CUSTOM_CATEGORY_VALUE">自訂類別</option>
               </select>
               <input
                 v-if="row.categoryName === CUSTOM_CATEGORY_VALUE"
@@ -256,7 +267,7 @@ type TransactionType = 'INCOME' | 'EXPENSE';
 
 interface EntryRow {
   id: number;
-  type: TransactionType;
+  type: TransactionType | '';
   transactionDate: string;
   amount: string;
   categoryName: string;
@@ -357,10 +368,10 @@ onMounted(() => {
 function createRow(): EntryRow {
   return {
     id: rowId++,
-    type: 'EXPENSE',
-    transactionDate: today,
+    type: '',
+    transactionDate: '',
     amount: '',
-    categoryName: '飲食',
+    categoryName: '',
     customCategoryName: '',
     note: ''
   };
@@ -374,12 +385,15 @@ function removeRow(index: number) {
   rows.value.splice(index, 1);
 }
 
-function categoriesByType(type: TransactionType) {
+function categoriesByType(type: TransactionType | '') {
+  if (!type) {
+    return [];
+  }
   return type === 'EXPENSE' ? expenseCategories : incomeCategories;
 }
 
 function resetCategoryForType(row: EntryRow) {
-  row.categoryName = categoriesByType(row.type)[0];
+  row.categoryName = '';
   row.customCategoryName = '';
 }
 
@@ -415,7 +429,7 @@ async function submitBatch() {
       },
       body: JSON.stringify({
         transactions: rows.value.map((row) => ({
-          type: row.type,
+          type: row.type as TransactionType,
           transactionDate: row.transactionDate,
           amount: Number(row.amount),
           categoryName: getCategoryName(row),

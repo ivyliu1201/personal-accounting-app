@@ -144,6 +144,28 @@ h2 {
   min-width: 0;
 }
 
+.date-field {
+  position: relative;
+  min-width: 0;
+}
+
+.date-placeholder {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  color: #52606d;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.date-field input.empty {
+  color: transparent;
+}
+
+.date-field input.empty:focus {
+  color: inherit;
+}
+
 .icon-button {
   height: 36px;
   padding: 0;
