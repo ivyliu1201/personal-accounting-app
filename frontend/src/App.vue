@@ -1,7 +1,7 @@
 <template>
   <main class="app-shell">
-    <nav class="top-bar" aria-label="主要導覽">
-      <strong>個人記帳系統</strong>
+    <nav class="top-bar" aria-label="主導覽">
+      <strong>個人記帳</strong>
       <div class="nav-links">
         <button type="button" :class="{ active: currentView === 'home' }" @click="showHome">首頁</button>
         <button type="button" :class="{ active: currentView === 'history' }" @click="showHistory">歷史查看</button>
@@ -10,13 +10,13 @@
     </nav>
 
     <section v-if="currentView === 'home'" class="workspace" aria-label="首頁">
-      <section class="entry-panel" aria-label="批次新增區">
-        <h1>批次新增區</h1>
+      <section class="entry-panel" aria-label="批次新增">
+        <h1>批次新增</h1>
 
         <div class="entry-list">
           <div v-for="(row, index) in rows" :key="row.id" class="entry-card">
             <select v-model="row.type" aria-label="收入或支出" @change="resetCategoryForType(row)">
-              <option value="">未選擇</option>
+              <option value="">類型</option>
               <option value="EXPENSE">支出</option>
               <option value="INCOME">收入</option>
             </select>
@@ -31,7 +31,7 @@
                 @focus="focusedDateRowId = row.id"
                 @input="handleDateInput(row)"
               />
-              <span v-if="!row.transactionDate && focusedDateRowId !== row.id" class="date-placeholder">未選擇</span>
+              <span v-if="!row.transactionDate && focusedDateRowId !== row.id" class="date-placeholder">日期</span>
             </div>
             <input
               v-model.trim="row.amount"
@@ -44,7 +44,7 @@
             />
             <div class="category-field">
               <select v-model="row.categoryName" aria-label="類別" @change="resetCustomCategory(row)">
-                <option value="">未選擇</option>
+                <option value="">類別</option>
                 <option v-for="category in categoriesByType(row.type)" :key="category" :value="category">
                   {{ category }}
                 </option>
@@ -59,146 +59,69 @@
                 aria-label="自訂類別"
               />
             </div>
-            <input
-              v-model.trim="row.note"
-              type="text"
-              maxlength="255"
-              placeholder="備註"
-              aria-label="備註"
-            />
+            <input v-model.trim="row.note" type="text" maxlength="255" placeholder="備註" aria-label="備註" />
 
             <button
               v-if="rows.length > 1"
               type="button"
               class="icon-button"
-              aria-label="移除此列"
+              aria-label="移除這筆"
               @click="removeRow(index)"
             >
-              ×
+              X
             </button>
           </div>
         </div>
 
         <div class="actions">
-          <button type="button" @click="addRow">繼續新增下一筆</button>
+          <button type="button" @click="addRow">新增一列</button>
           <button type="button" :disabled="!canSubmit || isSubmitting" @click="submitBatch">
             {{ isSubmitting ? '送出中' : '送出' }}
           </button>
         </div>
       </section>
 
-      <section class="summary-panel" aria-label="近期資料">
+      <section class="summary-panel" aria-label="統計資訊">
         <section class="chart-panel">
           <div class="panel-header">
-            <h2>類別摘要</h2>
+            <div>
+              <h2>類別占比</h2>
+              <p class="chart-title">{{ summaryChartTitle }}</p>
+            </div>
             <div class="segmented">
-              <button
-                type="button"
-                :class="{ active: summaryType === 'EXPENSE' }"
-                @click="setSummaryType('EXPENSE')"
-              >
-                支出類別
+              <button type="button" :class="{ active: summaryMode === 'EXPENSE' }" @click="setSummaryMode('EXPENSE')">
+                總支出
               </button>
-              <button
-                type="button"
-                :class="{ active: summaryType === 'INCOME' }"
-                @click="setSummaryType('INCOME')"
-              >
-                收入類別
+              <button type="button" :class="{ active: summaryMode === 'INCOME' }" @click="setSummaryMode('INCOME')">
+                總收入
+              </button>
+              <button type="button" :class="{ active: summaryMode === 'CASH_FLOW' }" @click="setSummaryMode('CASH_FLOW')">
+                總現金流
               </button>
             </div>
           </div>
-          <div class="donut-chart" :class="{ empty: categorySummaries.length === 0 }" aria-label="類別占比圖">
-            <template v-if="categorySummaries.length > 0">
-              <svg viewBox="0 0 120 120" role="img" aria-label="近 30 天類別占比">
-                <circle class="donut-bg" cx="60" cy="60" r="42" />
-                <circle
-                  v-for="segment in donutSegments"
-                  :key="segment.categoryName"
-                  class="donut-segment"
-                  cx="60"
-                  cy="60"
-                  r="42"
-                  :stroke="segment.color"
-                  :stroke-dasharray="`${segment.length} ${donutCircumference - segment.length}`"
-                  :stroke-dashoffset="segment.offset"
-                >
-                  <title>
-                    {{ typeLabel(summaryType) }} {{ segment.categoryName }} {{ formatAmount(segment.amount) }}
-                    {{ formatPercentage(segment.percentage) }}
-                  </title>
-                </circle>
-              </svg>
-              <div class="donut-center">
-                <span>{{ typeLabel(summaryType) }}</span>
-                <strong>{{ formatAmount(summaryTotal) }}</strong>
-              </div>
-            </template>
-            <span v-else>近 30 天沒有資料</span>
-          </div>
-          <table class="summary-table">
-            <thead>
-              <tr>
-                <th>類別</th>
-                <th>金額</th>
-                <th>占比</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="isLoadingSummary">
-                <td colspan="3">載入中</td>
-              </tr>
-              <tr v-else-if="categorySummaries.length === 0">
-                <td colspan="3">近 30 天沒有資料</td>
-              </tr>
-              <tr v-for="summary in categorySummaries" v-else :key="summary.categoryName">
-                <td>{{ summary.categoryName }}</td>
-                <td>{{ formatAmount(summary.amount) }}</td>
-                <td>{{ formatPercentage(summary.percentage) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <DonutBlock
+            :segments="donutSegments"
+            :total-label="summaryCenterLabel"
+            :total-amount="summaryCenterAmount"
+            :loading="isLoadingSummary"
+            empty-label="近 30 天沒有資料"
+          />
+          <SummaryTable :summaries="activeSummaryRows" :loading="isLoadingSummary" empty-label="近 30 天沒有資料" />
         </section>
 
         <section class="details-panel">
           <div class="panel-header">
-            <h2>最近明細</h2>
-            <select v-model.number="recentLimit" aria-label="每頁筆數" @change="loadRecent()">
+            <h2>最近紀錄</h2>
+            <select v-model.number="recentLimit" aria-label="最近筆數" @change="loadRecent()">
               <option :value="5">5 筆</option>
               <option :value="10">10 筆</option>
               <option :value="15">15 筆</option>
             </select>
           </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>收支</th>
-                <th>類別</th>
-                <th>金額</th>
-                <th>備註</th>
-                <th>建立日期</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="isLoadingRecent">
-                <td colspan="6">載入中</td>
-              </tr>
-              <tr v-else-if="recentTransactions.length === 0">
-                <td colspan="6">目前沒有資料</td>
-              </tr>
-              <tr v-for="transaction in recentTransactions" v-else :key="transaction.id">
-                <td>{{ transaction.transactionDate }}</td>
-                <td>{{ typeLabel(transaction.type) }}</td>
-                <td>{{ transaction.categoryName }}</td>
-                <td>{{ formatAmount(transaction.amount) }}</td>
-                <td class="truncate">{{ truncateNote(transaction.note) }}</td>
-                <td>{{ formatDateTime(transaction.createdAt) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <button type="button" @click="showHistory">查看更多</button>
+          <TransactionsTable :transactions="recentTransactions" :loading="isLoadingRecent" empty-label="目前沒有資料" />
+          <button type="button" @click="showHistory">查看全部</button>
         </section>
       </section>
     </section>
@@ -222,34 +145,7 @@
           </div>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>日期</th>
-              <th>收支</th>
-              <th>類別</th>
-              <th>金額</th>
-              <th>備註</th>
-              <th>建立日期</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isLoadingHistory">
-              <td colspan="6">載入中</td>
-            </tr>
-            <tr v-else-if="historyTransactions.length === 0">
-              <td colspan="6">此區間沒有資料</td>
-            </tr>
-            <tr v-for="transaction in historyTransactions" v-else :key="transaction.id">
-              <td>{{ transaction.transactionDate }}</td>
-              <td>{{ typeLabel(transaction.type) }}</td>
-              <td>{{ transaction.categoryName }}</td>
-              <td>{{ formatAmount(transaction.amount) }}</td>
-              <td class="truncate">{{ truncateNote(transaction.note) }}</td>
-              <td>{{ formatDateTime(transaction.createdAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <TransactionsTable :transactions="historyTransactions" :loading="isLoadingHistory" empty-label="查詢區間沒有資料" />
 
         <div class="pager">
           <button type="button" :disabled="historyPage === 0 || isLoadingHistory" @click="previousHistoryPage">上一頁</button>
@@ -261,87 +157,92 @@
       <aside class="history-side-panel">
         <section class="chart-panel history-summary-panel">
           <div class="panel-header">
-            <h2>類別摘要</h2>
-            <span>{{ typeLabel(historyType) }}</span>
+            <div>
+              <h2>類別占比</h2>
+              <p class="chart-title">{{ historySummaryChartTitle }}</p>
+            </div>
+            <div class="segmented">
+              <button
+                type="button"
+                :class="{ active: historySummaryMode === 'EXPENSE' }"
+                @click="setHistorySummaryMode('EXPENSE')"
+              >
+                總支出
+              </button>
+              <button
+                type="button"
+                :class="{ active: historySummaryMode === 'INCOME' }"
+                @click="setHistorySummaryMode('INCOME')"
+              >
+                總收入
+              </button>
+              <button
+                type="button"
+                :class="{ active: historySummaryMode === 'CASH_FLOW' }"
+                @click="setHistorySummaryMode('CASH_FLOW')"
+              >
+                總現金流
+              </button>
+            </div>
           </div>
-          <div class="donut-chart" :class="{ empty: historyCategorySummaries.length === 0 }" aria-label="歷史類別占比">
-            <template v-if="historyCategorySummaries.length > 0">
-              <svg viewBox="0 0 120 120" role="img" aria-label="歷史查詢區間類別占比">
-                <circle class="donut-bg" cx="60" cy="60" r="42" />
-                <circle
-                  v-for="segment in historyDonutSegments"
-                  :key="segment.categoryName"
-                  class="donut-segment"
-                  cx="60"
-                  cy="60"
-                  r="42"
-                  :stroke="segment.color"
-                  :stroke-dasharray="`${segment.length} ${donutCircumference - segment.length}`"
-                  :stroke-dashoffset="segment.offset"
-                >
-                  <title>
-                    {{ typeLabel(historyType) }} {{ segment.categoryName }} {{ formatAmount(segment.amount) }}
-                    {{ formatPercentage(segment.percentage) }}
-                  </title>
-                </circle>
-              </svg>
-              <div class="donut-center">
-                <span>{{ typeLabel(historyType) }}</span>
-                <strong>{{ formatAmount(historySummaryTotal) }}</strong>
-              </div>
-            </template>
-            <span v-else>查詢區間沒有資料</span>
-          </div>
-          <table class="summary-table">
-            <thead>
-              <tr>
-                <th>類別</th>
-                <th>金額</th>
-                <th>占比</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="isLoadingHistorySummary">
-                <td colspan="3">載入中</td>
-              </tr>
-              <tr v-else-if="historyCategorySummaries.length === 0">
-                <td colspan="3">查詢區間沒有資料</td>
-              </tr>
-              <tr v-for="summary in historyCategorySummaries" v-else :key="summary.categoryName">
-                <td>{{ summary.categoryName }}</td>
-                <td>{{ formatAmount(summary.amount) }}</td>
-                <td>{{ formatPercentage(summary.percentage) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <DonutBlock
+            :segments="historyDonutSegments"
+            :total-label="historySummaryCenterLabel"
+            :total-amount="historySummaryCenterAmount"
+            :loading="isLoadingHistorySummary"
+            empty-label="查詢區間沒有資料"
+          />
+          <SummaryTable
+            :summaries="activeHistorySummaryRows"
+            :loading="isLoadingHistorySummary"
+            empty-label="查詢區間沒有資料"
+          />
         </section>
 
         <section class="chart-panel history-trend-panel">
           <div class="panel-header">
-            <h2>趨勢圖</h2>
-            <span>{{ historyTrendLabel }}</span>
+            <div>
+              <h2>現金流折線圖</h2>
+              <p class="chart-title">{{ historyTrendLabel }}</p>
+            </div>
           </div>
 
           <div v-if="isLoadingHistoryTrend" class="line-chart empty">載入中</div>
-          <div v-else-if="historyTrendPoints.length === 0" class="line-chart empty">查詢區間沒有資料</div>
-          <div v-else class="line-chart" aria-label="歷史趨勢圖">
-            <svg viewBox="0 0 320 180" role="img">
-              <polyline class="line-grid" points="52,28 52,140 292,140" />
-              <text class="line-axis-label line-axis-label-y" transform="translate(12 96) rotate(-90)">
-                Y 軸：累積金額
-              </text>
-              <text class="line-axis-label line-axis-label-x" x="172" y="174" text-anchor="middle">
-                X 軸：{{ historyTrendXAxisLabel }}
-              </text>
-              <polyline class="line-path" :points="historyLinePoints" />
-              <g v-for="point in historyLinePointDetails" :key="point.label">
-                <circle class="line-point" :cx="point.x" :cy="point.y" r="4">
-                  <title>{{ point.label }} {{ historyTrendLabel }} {{ formatCurrency(point.value) }}</title>
-                </circle>
-                <text class="line-point-value" :x="point.x" :y="point.labelY" text-anchor="middle">
-                  {{ formatCurrency(point.value) }}
+          <div v-else-if="historyTrendPoints.length === 0" class="line-chart empty">查詢年度沒有資料</div>
+          <div v-else class="line-chart" aria-label="年度每月總現金流變化">
+            <svg viewBox="0 0 340 210" role="img">
+              <polyline class="line-grid" :points="lineAxisPoints" />
+              <g v-for="tick in yAxisTicks" :key="tick.value">
+                <line class="line-grid-line" :x1="LINE_CHART_LEFT" :x2="LINE_CHART_RIGHT" :y1="tick.y" :y2="tick.y" />
+                <text class="line-axis-tick line-axis-tick-y" :x="LINE_CHART_LEFT - 8" :y="tick.y + 4" text-anchor="end">
+                  {{ formatCompactCurrency(tick.value) }}
                 </text>
               </g>
+              <line
+                v-if="lineZeroY !== null"
+                class="line-zero"
+                :x1="LINE_CHART_LEFT"
+                :x2="LINE_CHART_RIGHT"
+                :y1="lineZeroY"
+                :y2="lineZeroY"
+              />
+              <polyline class="line-path" :points="historyLinePoints" />
+              <g v-for="point in historyLinePointDetails" :key="point.label" class="line-data-point">
+                <line class="line-guide" :x1="point.x" :x2="point.x" :y1="point.y" :y2="LINE_CHART_BOTTOM" />
+                <text class="line-axis-tick line-axis-tick-x" :x="point.x" :y="LINE_CHART_BOTTOM + 18" text-anchor="middle">
+                  {{ point.axisLabel }}
+                </text>
+                <circle class="line-point" :cx="point.x" :cy="point.y" r="4">
+                  <title>{{ point.label }} 總現金流 {{ formatSignedCurrency(point.value) }}</title>
+                </circle>
+                <text class="line-point-value" :x="point.x" :y="point.valueLabelY" text-anchor="middle">
+                  {{ point.axisLabel }} 月 {{ formatCompactCurrency(point.value) }}
+                </text>
+              </g>
+              <text class="line-axis-corner line-axis-corner-y" :x="LINE_CHART_LEFT - 36" :y="LINE_CHART_TOP - 8">金額</text>
+              <text class="line-axis-corner line-axis-corner-x" :x="LINE_CHART_RIGHT" :y="LINE_CHART_BOTTOM + 36" text-anchor="end">
+                月份
+              </text>
             </svg>
           </div>
         </section>
@@ -353,9 +254,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue';
 
 type TransactionType = 'INCOME' | 'EXPENSE';
+// TODO: SPEC currently defines income/expense charts; cash-flow mode is implemented for this requested change.
+type SummaryMode = TransactionType | 'CASH_FLOW';
 
 interface EntryRow {
   id: number;
@@ -383,6 +286,10 @@ interface CategorySummaryResponse {
   percentage: number;
 }
 
+interface CategoryOptionResponse {
+  name: string;
+}
+
 interface HistoryTransactionsResponse {
   transactions: TransactionResponse[];
   page: number;
@@ -390,10 +297,7 @@ interface HistoryTransactionsResponse {
   hasNext: boolean;
 }
 
-interface DonutSegment {
-  categoryName: string;
-  amount: number;
-  percentage: number;
+interface DonutSegment extends CategorySummaryResponse {
   color: string;
   length: number;
   offset: number;
@@ -407,33 +311,47 @@ interface HistoryTrendPointResponse {
 
 interface LinePoint {
   label: string;
+  axisLabel: string;
   value: number;
   x: number;
   y: number;
-  labelY: number;
+  valueLabelY: number;
 }
 
-const expenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長', '社交', '治裝費', '運動'];
-const incomeCategories = ['投資', '薪資'];
+interface AxisTick {
+  value: number;
+  y: number;
+}
+
+const defaultExpenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長', '社交', '治裝費', '運動'];
+const defaultIncomeCategories = ['投資', '薪資'];
 const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
 const DONUT_RADIUS = 42;
 const donutCircumference = 2 * Math.PI * DONUT_RADIUS;
 const chartColors = ['#3273dc', '#1f9d55', '#d97706', '#8b5cf6', '#dc2626', '#0891b2', '#4b5563', '#be185d'];
-const LINE_CHART_LEFT = 52;
-const LINE_CHART_RIGHT = 292;
-const LINE_CHART_TOP = 28;
-const LINE_CHART_BOTTOM = 140;
+const LINE_CHART_LEFT = 58;
+const LINE_CHART_RIGHT = 306;
+const LINE_CHART_TOP = 26;
+const LINE_CHART_BOTTOM = 150;
+const lineAxisPoints = `${LINE_CHART_LEFT},${LINE_CHART_TOP} ${LINE_CHART_LEFT},${LINE_CHART_BOTTOM} ${LINE_CHART_RIGHT},${LINE_CHART_BOTTOM}`;
 
 const today = new Date().toISOString().slice(0, 10);
 const defaultHistoryStartDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 let rowId = 1;
+
 const rows = ref<EntryRow[]>([createRow()]);
 const currentView = ref<'home' | 'history'>('home');
 const recentTransactions = ref<TransactionResponse[]>([]);
 const historyTransactions = ref<TransactionResponse[]>([]);
-const categorySummaries = ref<CategorySummaryResponse[]>([]);
-const historyCategorySummaries = ref<CategorySummaryResponse[]>([]);
+const expenseCategorySummaries = ref<CategorySummaryResponse[]>([]);
+const incomeCategorySummaries = ref<CategorySummaryResponse[]>([]);
+const historyExpenseCategorySummaries = ref<CategorySummaryResponse[]>([]);
+const historyIncomeCategorySummaries = ref<CategorySummaryResponse[]>([]);
 const historyTrendPoints = ref<HistoryTrendPointResponse[]>([]);
+const categoryOptions = ref<Record<TransactionType, string[]>>({
+  EXPENSE: defaultExpenseCategories,
+  INCOME: defaultIncomeCategories
+});
 const recentLimit = ref(5);
 const historyType = ref<TransactionType>('EXPENSE');
 const historyStartDate = ref(defaultHistoryStartDate);
@@ -441,7 +359,8 @@ const historyEndDate = ref(today);
 const historyPage = ref(0);
 const historySize = ref(10);
 const historyHasNext = ref(false);
-const summaryType = ref<TransactionType>('EXPENSE');
+const summaryMode = ref<SummaryMode>('EXPENSE');
+const historySummaryMode = ref<SummaryMode>('EXPENSE');
 const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
 const isLoadingHistory = ref(false);
@@ -456,31 +375,65 @@ const canSubmit = computed(() => rows.value.every((row) => {
   return row.type && row.transactionDate && amount > 0 && getCategoryName(row);
 }));
 
-const summaryTotal = computed(() => categorySummaries.value.reduce((total, summary) => total + summary.amount, 0));
-const historySummaryTotal = computed(() => historyCategorySummaries.value.reduce((total, summary) => total + summary.amount, 0));
-const isSameMonthHistoryQuery = computed(() => historyStartDate.value.slice(0, 7) === historyEndDate.value.slice(0, 7));
-const historyTrendLabel = computed(() => {
-  const unit = isSameMonthHistoryQuery.value ? '每日累積' : '每月累積';
-  return `${unit}${historyType.value === 'EXPENSE' ? '支出' : '收入'}`;
+const summaryIncomeTotal = computed(() => sumSummaries(incomeCategorySummaries.value));
+const summaryExpenseTotal = computed(() => sumSummaries(expenseCategorySummaries.value));
+const historyIncomeTotal = computed(() => sumSummaries(historyIncomeCategorySummaries.value));
+const historyExpenseTotal = computed(() => sumSummaries(historyExpenseCategorySummaries.value));
+const historyTrendYear = computed(() => Number(historyStartDate.value.slice(0, 4)));
+const historyTrendLabel = computed(() => `${historyTrendYear.value} 年每月總現金流變化`);
+
+const activeSummaryRows = computed(() => getSummaryRows(
+  summaryMode.value,
+  expenseCategorySummaries.value,
+  incomeCategorySummaries.value
+));
+const activeHistorySummaryRows = computed(() => getSummaryRows(
+  historySummaryMode.value,
+  historyExpenseCategorySummaries.value,
+  historyIncomeCategorySummaries.value
+));
+const summaryCenterLabel = computed(() => summaryMode.value === 'CASH_FLOW' ? '現金流' : typeLabel(summaryMode.value));
+const historySummaryCenterLabel = computed(() => historySummaryMode.value === 'CASH_FLOW' ? '現金流' : typeLabel(historySummaryMode.value));
+const summaryCenterAmount = computed(() => getCenterAmount(summaryMode.value, summaryExpenseTotal.value, summaryIncomeTotal.value));
+const historySummaryCenterAmount = computed(() => getCenterAmount(historySummaryMode.value, historyExpenseTotal.value, historyIncomeTotal.value));
+const summaryChartTitle = computed(() => `近 30 天${summaryModeLabel(summaryMode.value)}圓餅圖`);
+const historySummaryChartTitle = computed(() => `${formatRangeLabel(historyStartDate.value, historyEndDate.value)}${summaryModeLabel(historySummaryMode.value)}圓餅圖`);
+const donutSegments = computed(() => buildDonutSegments(activeSummaryRows.value));
+const historyDonutSegments = computed(() => buildDonutSegments(activeHistorySummaryRows.value));
+const historyTrendValues = computed(() => historyTrendPoints.value.map((point) => point.amount));
+const lineMinValue = computed(() => getLineRange().min);
+const lineMaxValue = computed(() => getLineRange().max);
+const lineZeroY = computed(() => scaleLineValue(0));
+const yAxisTicks = computed<AxisTick[]>(() => {
+  const minValue = lineMinValue.value;
+  const maxValue = lineMaxValue.value;
+  const tickCount = 5;
+  const step = (maxValue - minValue) / (tickCount - 1);
+
+  return Array.from({ length: tickCount }, (_, index) => {
+    const value = minValue + (step * index);
+    return {
+      value: Math.round(value),
+      y: scaleLineValue(value) ?? LINE_CHART_BOTTOM
+    };
+  }).reverse();
 });
-const historyTrendXAxisLabel = computed(() => (isSameMonthHistoryQuery.value ? '日期' : '月份'));
-const historyTrendValues = computed(() => historyTrendPoints.value.map((point) => point.cumulativeAmount));
 const historyLinePointDetails = computed<LinePoint[]>(() => {
-  const maxValue = Math.max(...historyTrendValues.value, 1);
   const xRange = LINE_CHART_RIGHT - LINE_CHART_LEFT;
-  const yRange = LINE_CHART_BOTTOM - LINE_CHART_TOP;
-  const lastIndex = historyTrendPoints.value.length - 1;
+  const lastIndex = Math.max(historyTrendPoints.value.length - 1, 1);
 
   return historyTrendPoints.value.map((point, index) => {
-    const value = historyTrendValues.value[index] ?? 0;
-    const x = lastIndex === 0 ? (LINE_CHART_LEFT + LINE_CHART_RIGHT) / 2 : LINE_CHART_LEFT + (xRange * index / lastIndex);
-    const y = LINE_CHART_BOTTOM - (yRange * value / maxValue);
+    const value = point.amount;
+    const x = LINE_CHART_LEFT + (xRange * index / lastIndex);
+    const y = scaleLineValue(value) ?? LINE_CHART_BOTTOM;
+    const valueLabelY = y < LINE_CHART_TOP + 18 ? y + 18 : y - 10;
     return {
       label: point.label,
+      axisLabel: formatTrendMonth(point.label),
       value,
       x,
       y,
-      labelY: Math.max(y - 10, 12)
+      valueLabelY
     };
   });
 });
@@ -488,32 +441,108 @@ const historyLinePoints = computed(() => historyLinePointDetails.value
   .map((point) => `${point.x},${point.y}`)
   .join(' '));
 
-const donutSegments = computed<DonutSegment[]>(() => {
-  return buildDonutSegments(categorySummaries.value);
+const TransactionsTable = defineComponent({
+  props: {
+    transactions: { type: Array as PropType<TransactionResponse[]>, required: true },
+    loading: { type: Boolean, required: true },
+    emptyLabel: { type: String, required: true }
+  },
+  setup(props) {
+    return () => h('table', [
+      h('thead', h('tr', [
+        h('th', '日期'),
+        h('th', '類型'),
+        h('th', '類別'),
+        h('th', '金額'),
+        h('th', '備註'),
+        h('th', '建立時間')
+      ])),
+      h('tbody', props.loading
+        ? h('tr', h('td', { colspan: 6 }, '載入中'))
+        : props.transactions.length === 0
+          ? h('tr', h('td', { colspan: 6 }, props.emptyLabel))
+          : props.transactions.map((transaction) => h('tr', { key: transaction.id }, [
+            h('td', transaction.transactionDate),
+            h('td', typeLabel(transaction.type)),
+            h('td', transaction.categoryName),
+            h('td', formatAmount(transaction.amount)),
+            h('td', { class: 'truncate' }, truncateNote(transaction.note)),
+            h('td', formatDateTime(transaction.createdAt))
+          ]))
+      )
+    ]);
+  }
 });
 
-const historyDonutSegments = computed<DonutSegment[]>(() => {
-  return buildDonutSegments(historyCategorySummaries.value);
+const SummaryTable = defineComponent({
+  props: {
+    summaries: { type: Array as PropType<CategorySummaryResponse[]>, required: true },
+    loading: { type: Boolean, required: true },
+    emptyLabel: { type: String, required: true }
+  },
+  setup(props) {
+    return () => h('table', { class: 'summary-table' }, [
+      h('thead', h('tr', [
+        h('th', '項目'),
+        h('th', '金額'),
+        h('th', '比例')
+      ])),
+      h('tbody', props.loading
+        ? h('tr', h('td', { colspan: 3 }, '載入中'))
+        : props.summaries.length === 0
+          ? h('tr', h('td', { colspan: 3 }, props.emptyLabel))
+          : props.summaries.map((summary) => h('tr', { key: summary.categoryName }, [
+            h('td', summary.categoryName),
+            h('td', formatSignedCurrency(summary.amount)),
+            h('td', formatPercentage(summary.percentage))
+          ]))
+      )
+    ]);
+  }
 });
 
-function buildDonutSegments(summaries: CategorySummaryResponse[]) {
-  let usedLength = 0;
-  return summaries.map((summary, index) => {
-    const length = donutCircumference * (summary.percentage / 100);
-    const segment = {
-      categoryName: summary.categoryName,
-      amount: summary.amount,
-      percentage: summary.percentage,
-      color: chartColors[index % chartColors.length],
-      length,
-      offset: -usedLength
-    };
-    usedLength += length;
-    return segment;
-  });
-}
+const DonutBlock = defineComponent({
+  props: {
+    segments: { type: Array as PropType<DonutSegment[]>, required: true },
+    totalLabel: { type: String, required: true },
+    totalAmount: { type: Number, required: true },
+    loading: { type: Boolean, required: true },
+    emptyLabel: { type: String, required: true }
+  },
+  setup(props) {
+    return () => h('div', {
+      class: ['donut-chart', { empty: props.loading || props.segments.length === 0 }],
+      'aria-label': '圓餅圖'
+    }, props.loading
+      ? '載入中'
+      : props.segments.length === 0
+        ? props.emptyLabel
+        : [
+          h('svg', { viewBox: '0 0 120 120', role: 'img' }, [
+            h('circle', { class: 'donut-bg', cx: 60, cy: 60, r: DONUT_RADIUS }),
+            props.segments.map((segment) => h('circle', {
+              key: segment.categoryName,
+              class: 'donut-segment',
+              cx: 60,
+              cy: 60,
+              r: DONUT_RADIUS,
+              stroke: segment.color,
+              'stroke-dasharray': `${segment.length} ${donutCircumference - segment.length}`,
+              'stroke-dashoffset': segment.offset
+            }, [
+              h('title', `${segment.categoryName} ${formatSignedCurrency(segment.amount)} ${formatPercentage(segment.percentage)}`)
+            ]))
+          ]),
+          h('div', { class: 'donut-center' }, [
+            h('span', props.totalLabel),
+            h('strong', formatSignedCurrency(props.totalAmount))
+          ])
+        ]);
+  }
+});
 
 onMounted(() => {
+  void loadCategories();
   void loadRecent();
   void loadCategorySummary();
 });
@@ -542,7 +571,7 @@ function categoriesByType(type: TransactionType | '') {
   if (!type) {
     return [];
   }
-  return type === 'EXPENSE' ? expenseCategories : incomeCategories;
+  return categoryOptions.value[type];
 }
 
 function resetCategoryForType(row: EntryRow) {
@@ -579,7 +608,7 @@ async function submitBatch() {
   }
 
   if (!canSubmit.value) {
-    showMessage('請完成所有必填欄位');
+    showMessage('請完成每筆資料');
     return;
   }
 
@@ -602,15 +631,16 @@ async function submitBatch() {
     });
 
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '新增失敗，請確認欄位內容後再試一次'));
+      throw new Error(await getErrorMessage(response, '新增失敗，請確認欄位內容'));
     }
 
     rows.value = [createRow()];
-    const [recentLoaded, summaryLoaded] = await Promise.all([
+    const [recentLoaded, summaryLoaded, categoriesLoaded] = await Promise.all([
       loadRecent(false),
-      loadCategorySummary(false)
+      loadCategorySummary(false),
+      loadCategories(false)
     ]);
-    showMessage(recentLoaded && summaryLoaded ? '新增成功，明細已更新' : '新增成功，但資料重新整理失敗，請重新整理頁面');
+    showMessage(recentLoaded && summaryLoaded && categoriesLoaded ? '新增完成' : '新增完成，部分資料重新載入失敗');
   } catch (error) {
     showMessage(error instanceof Error ? error.message : '新增失敗');
   } finally {
@@ -618,9 +648,12 @@ async function submitBatch() {
   }
 }
 
-function setSummaryType(type: TransactionType) {
-  summaryType.value = type;
-  void loadCategorySummary();
+function setSummaryMode(mode: SummaryMode) {
+  summaryMode.value = mode;
+}
+
+function setHistorySummaryMode(mode: SummaryMode) {
+  historySummaryMode.value = mode;
 }
 
 function showHome() {
@@ -632,18 +665,45 @@ function showHistory() {
   void loadHistoryView();
 }
 
+async function loadCategories(showError = true) {
+  try {
+    const [expenseResponse, incomeResponse] = await Promise.all([
+      fetch('/api/transactions/categories?type=EXPENSE'),
+      fetch('/api/transactions/categories?type=INCOME')
+    ]);
+    if (!expenseResponse.ok || !incomeResponse.ok) {
+      throw new Error('類別載入失敗');
+    }
+
+    const [expenseOptions, incomeOptions] = await Promise.all([
+      expenseResponse.json() as Promise<CategoryOptionResponse[]>,
+      incomeResponse.json() as Promise<CategoryOptionResponse[]>
+    ]);
+    categoryOptions.value = {
+      EXPENSE: mergeCategories(defaultExpenseCategories, expenseOptions.map((category) => category.name)),
+      INCOME: mergeCategories(defaultIncomeCategories, incomeOptions.map((category) => category.name))
+    };
+    return true;
+  } catch (error) {
+    if (showError) {
+      showMessage(error instanceof Error ? error.message : '類別載入失敗');
+    }
+    return false;
+  }
+}
+
 async function loadRecent(showError = true) {
   isLoadingRecent.value = true;
   try {
     const response = await fetch(`/api/transactions/recent?limit=${recentLimit.value}`);
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '最近明細載入失敗，請稍後再試'));
+      throw new Error(await getErrorMessage(response, '最近紀錄載入失敗'));
     }
     recentTransactions.value = await response.json() as TransactionResponse[];
     return true;
   } catch (error) {
     if (showError) {
-      showMessage(error instanceof Error ? error.message : '最近明細載入失敗');
+      showMessage(error instanceof Error ? error.message : '最近紀錄載入失敗');
     }
     return false;
   } finally {
@@ -653,6 +713,9 @@ async function loadRecent(showError = true) {
 
 async function resetHistoryPageAndLoad() {
   historyPage.value = 0;
+  if (historySummaryMode.value !== 'CASH_FLOW') {
+    historySummaryMode.value = historyType.value;
+  }
   await loadHistoryView();
 }
 
@@ -672,10 +735,14 @@ async function nextHistoryPage() {
   await loadHistory();
 }
 
+async function loadHistoryView() {
+  await Promise.all([loadHistory(), loadHistoryCategorySummary(), loadHistoryTrend()]);
+}
+
 async function loadHistory() {
   if (historyStartDate.value > historyEndDate.value) {
     showMessage('開始日期不可晚於結束日期');
-    return;
+    return false;
   }
 
   isLoadingHistory.value = true;
@@ -689,36 +756,35 @@ async function loadHistory() {
     });
     const response = await fetch(`/api/transactions/history?${params.toString()}`);
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '歷史明細載入失敗，請稍後再試'));
+      throw new Error(await getErrorMessage(response, '歷史紀錄載入失敗'));
     }
     const data = await response.json() as HistoryTransactionsResponse;
     historyTransactions.value = data.transactions;
     historyPage.value = data.page;
     historySize.value = data.size;
     historyHasNext.value = data.hasNext;
+    return true;
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : '歷史明細載入失敗');
+    showMessage(error instanceof Error ? error.message : '歷史紀錄載入失敗');
+    return false;
   } finally {
     isLoadingHistory.value = false;
   }
 }
 
-async function loadHistoryView() {
-  await Promise.all([loadHistory(), loadHistoryCategorySummary(), loadHistoryTrend()]);
-}
-
 async function loadCategorySummary(showError = true) {
   isLoadingSummary.value = true;
   try {
-    const response = await fetch(`/api/transactions/category-summary?type=${summaryType.value}`);
-    if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '類別摘要載入失敗，請稍後再試'));
-    }
-    categorySummaries.value = await response.json() as CategorySummaryResponse[];
+    const [expenseSummaries, incomeSummaries] = await Promise.all([
+      fetchCategorySummary('EXPENSE'),
+      fetchCategorySummary('INCOME')
+    ]);
+    expenseCategorySummaries.value = expenseSummaries;
+    incomeCategorySummaries.value = incomeSummaries;
     return true;
   } catch (error) {
     if (showError) {
-      showMessage(error instanceof Error ? error.message : '類別摘要載入失敗');
+      showMessage(error instanceof Error ? error.message : '類別占比載入失敗');
     }
     return false;
   } finally {
@@ -728,25 +794,22 @@ async function loadCategorySummary(showError = true) {
 
 async function loadHistoryCategorySummary() {
   if (historyStartDate.value > historyEndDate.value) {
-    historyCategorySummaries.value = [];
+    historyExpenseCategorySummaries.value = [];
+    historyIncomeCategorySummaries.value = [];
     return false;
   }
 
   isLoadingHistorySummary.value = true;
   try {
-    const params = new URLSearchParams({
-      type: historyType.value,
-      startDate: historyStartDate.value,
-      endDate: historyEndDate.value
-    });
-    const response = await fetch(`/api/transactions/category-summary?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '歷史類別摘要載入失敗，請稍後再試'));
-    }
-    historyCategorySummaries.value = await response.json() as CategorySummaryResponse[];
+    const [expenseSummaries, incomeSummaries] = await Promise.all([
+      fetchCategorySummary('EXPENSE', historyStartDate.value, historyEndDate.value),
+      fetchCategorySummary('INCOME', historyStartDate.value, historyEndDate.value)
+    ]);
+    historyExpenseCategorySummaries.value = expenseSummaries;
+    historyIncomeCategorySummaries.value = incomeSummaries;
     return true;
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : '歷史類別摘要載入失敗');
+    showMessage(error instanceof Error ? error.message : '歷史類別占比載入失敗');
     return false;
   } finally {
     isLoadingHistorySummary.value = false;
@@ -754,30 +817,36 @@ async function loadHistoryCategorySummary() {
 }
 
 async function loadHistoryTrend() {
-  if (historyStartDate.value > historyEndDate.value) {
-    historyTrendPoints.value = [];
-    return false;
-  }
-
   isLoadingHistoryTrend.value = true;
   try {
     const params = new URLSearchParams({
-      type: historyType.value,
-      startDate: historyStartDate.value,
-      endDate: historyEndDate.value
+      year: String(historyTrendYear.value)
     });
-    const response = await fetch(`/api/transactions/history-trend?${params.toString()}`);
+    const response = await fetch(`/api/transactions/cash-flow-trend?${params.toString()}`);
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '歷史趨勢載入失敗，請稍後再試'));
+      throw new Error(await getErrorMessage(response, '現金流折線圖載入失敗'));
     }
     historyTrendPoints.value = await response.json() as HistoryTrendPointResponse[];
     return true;
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : '歷史趨勢載入失敗');
+    showMessage(error instanceof Error ? error.message : '現金流折線圖載入失敗');
     return false;
   } finally {
     isLoadingHistoryTrend.value = false;
   }
+}
+
+async function fetchCategorySummary(type: TransactionType, startDate?: string, endDate?: string) {
+  const params = new URLSearchParams({ type });
+  if (startDate && endDate) {
+    params.set('startDate', startDate);
+    params.set('endDate', endDate);
+  }
+  const response = await fetch(`/api/transactions/category-summary?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, '類別占比載入失敗'));
+  }
+  return await response.json() as CategorySummaryResponse[];
 }
 
 async function getErrorMessage(response: Response, fallbackMessage: string) {
@@ -788,6 +857,131 @@ async function getErrorMessage(response: Response, fallbackMessage: string) {
   return text || fallbackMessage;
 }
 
+function mergeCategories(defaultCategories: string[], loadedCategories: string[]) {
+  return Array.from(new Set([...defaultCategories, ...loadedCategories]));
+}
+
+function getSummaryRows(
+  mode: SummaryMode,
+  expenseSummaries: CategorySummaryResponse[],
+  incomeSummaries: CategorySummaryResponse[]
+) {
+  if (mode === 'EXPENSE') {
+    return expenseSummaries;
+  }
+  if (mode === 'INCOME') {
+    return incomeSummaries;
+  }
+  return buildCashFlowRows(sumSummaries(incomeSummaries), sumSummaries(expenseSummaries));
+}
+
+function buildCashFlowRows(incomeTotal: number, expenseTotal: number): CategorySummaryResponse[] {
+  const total = incomeTotal + expenseTotal;
+  if (total <= 0) {
+    return [];
+  }
+  return [
+    {
+      categoryName: '總收入',
+      amount: incomeTotal,
+      percentage: calculatePercentage(incomeTotal, total)
+    },
+    {
+      categoryName: '總支出',
+      amount: expenseTotal,
+      percentage: calculatePercentage(expenseTotal, total)
+    }
+  ];
+}
+
+function getCenterAmount(mode: SummaryMode, expenseTotal: number, incomeTotal: number) {
+  if (mode === 'EXPENSE') {
+    return expenseTotal;
+  }
+  if (mode === 'INCOME') {
+    return incomeTotal;
+  }
+  return incomeTotal - expenseTotal;
+}
+
+function buildDonutSegments(summaries: CategorySummaryResponse[]) {
+  let usedLength = 0;
+  return summaries.map((summary, index) => {
+    const length = donutCircumference * (summary.percentage / 100);
+    const segment = {
+      ...summary,
+      color: chartColors[index % chartColors.length],
+      length,
+      offset: -usedLength
+    };
+    usedLength += length;
+    return segment;
+  });
+}
+
+function sumSummaries(summaries: CategorySummaryResponse[]) {
+  return summaries.reduce((total, summary) => total + summary.amount, 0);
+}
+
+function calculatePercentage(amount: number, total: number) {
+  if (total === 0) {
+    return 0;
+  }
+  return Number(((amount / total) * 100).toFixed(2));
+}
+
+function getLineRange() {
+  const values = historyTrendValues.value;
+  const rawMin = Math.min(...values, 0);
+  const rawMax = Math.max(...values, 0);
+  const spread = rawMax - rawMin;
+  const padding = spread === 0 ? 1 : spread * 0.12;
+
+  return {
+    min: rawMin - padding,
+    max: rawMax + padding
+  };
+}
+
+function scaleLineValue(value: number) {
+  const minValue = lineMinValue.value;
+  const maxValue = lineMaxValue.value;
+  if (maxValue === minValue) {
+    return (LINE_CHART_TOP + LINE_CHART_BOTTOM) / 2;
+  }
+  const yRange = LINE_CHART_BOTTOM - LINE_CHART_TOP;
+  return LINE_CHART_BOTTOM - ((value - minValue) / (maxValue - minValue) * yRange);
+}
+
+function formatTrendMonth(label: string) {
+  const month = Number(label.slice(5, 7));
+  return Number.isNaN(month) ? label : String(month);
+}
+
+function summaryModeLabel(mode: SummaryMode) {
+  if (mode === 'EXPENSE') {
+    return '總支出';
+  }
+  if (mode === 'INCOME') {
+    return '總收入';
+  }
+  return '總現金流';
+}
+
+function formatRangeLabel(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const startMonth = start.getMonth() + 1;
+  const endMonth = end.getMonth() + 1;
+  if (start.getFullYear() === end.getFullYear() && startMonth === endMonth) {
+    return `${startMonth} 月`;
+  }
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${startMonth}-${endMonth} 月`;
+  }
+  return `${start.getFullYear()}/${startMonth}-${end.getFullYear()}/${endMonth}`;
+}
+
 function typeLabel(type: TransactionType) {
   return type === 'EXPENSE' ? '支出' : '收入';
 }
@@ -796,8 +990,18 @@ function formatAmount(amount: number) {
   return new Intl.NumberFormat('zh-TW').format(amount);
 }
 
-function formatCurrency(amount: number) {
-  return `$${formatAmount(amount)}`;
+function formatSignedCurrency(amount: number) {
+  const prefix = amount < 0 ? '-' : '';
+  return `${prefix}$${formatAmount(Math.abs(amount))}`;
+}
+
+function formatCompactCurrency(amount: number) {
+  const absoluteAmount = Math.abs(amount);
+  const prefix = amount < 0 ? '-' : '';
+  if (absoluteAmount >= 10000) {
+    return `${prefix}$${new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 1 }).format(absoluteAmount / 10000)}萬`;
+  }
+  return `${prefix}$${formatAmount(absoluteAmount)}`;
 }
 
 function formatPercentage(percentage: number) {

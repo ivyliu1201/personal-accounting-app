@@ -72,6 +72,13 @@ public class TransactionController {
         return transactionService.listCategorySummaries(type, startDate, endDate);
     }
 
+    @GetMapping("/categories")
+    public List<CategoryOptionResponse> listCategories(
+            @RequestParam(defaultValue = "EXPENSE") TransactionType type
+    ) {
+        return transactionService.listCategoryOptions(type);
+    }
+
     @GetMapping("/history-trend")
     public List<HistoryTrendPointResponse> listHistoryTrend(
             @RequestParam(defaultValue = "EXPENSE") TransactionType type,
@@ -79,5 +86,12 @@ public class TransactionController {
             @RequestParam LocalDate endDate
     ) {
         return transactionService.listHistoryTrend(type, startDate, endDate);
+    }
+
+    @GetMapping("/cash-flow-trend")
+    public List<HistoryTrendPointResponse> listCashFlowTrend(
+            @RequestParam(required = false) Integer year
+    ) {
+        return transactionService.listAnnualCashFlowTrend(year);
     }
 }

@@ -13,7 +13,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -121,6 +123,15 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
+    public List<CategoryOptionResponse> listCategoryOptions(TransactionType type) {
+        String userId = currentUserProvider.getCurrentUserId();
+        return categoryRepository.listVisibleCategoryNames(userId, type)
+                .stream()
+                .map(CategoryOptionResponse::new)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<HistoryTrendPointResponse> listHistoryTrend(
             TransactionType type,
             LocalDate startDate,
@@ -143,6 +154,49 @@ public class TransactionService {
         }
 
         return responses;
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistoryTrendPointResponse> listAnnualCashFlowTrend(Integer requestedYear) {
+        String userId = currentUserProvider.getCurrentUserId();
+        LocalDate today = LocalDate.now(clock);
+        int year = requestedYear == null ? today.getYear() : requestedYear;
+        int endMonth = getAnnualTrendEndMonth(year, today);
+        LocalDate startDate = LocalDate.of(year, 1, 1);
+        LocalDate endDate = endMonth == 0
+                ? startDate
+                : YearMonth.of(year, endMonth).atEndOfMonth();
+        Map<Integer, BigDecimal> amountByMonth = new HashMap<>();
+
+        for (HistoryTrendPointProjection trendPoint : transactionRepository.listMonthlyCashFlowTrend(
+                userId,
+                TransactionType.INCOME,
+                startDate,
+                endDate
+        )) {
+            amountByMonth.put(trendPoint.getMonth(), trendPoint.getAmount());
+        }
+
+        List<HistoryTrendPointResponse> responses = new ArrayList<>();
+        for (int month = 1; month <= endMonth; month++) {
+            BigDecimal amount = amountByMonth.getOrDefault(month, BigDecimal.ZERO);
+            responses.add(new HistoryTrendPointResponse(
+                    YearMonth.of(year, month).toString(),
+                    amount,
+                    amount
+            ));
+        }
+        return responses;
+    }
+
+    private int getAnnualTrendEndMonth(int year, LocalDate today) {
+        if (year < today.getYear()) {
+            return 12;
+        }
+        if (year == today.getYear()) {
+            return today.getMonthValue();
+        }
+        return 0;
     }
 
     private boolean isSameMonth(LocalDate startDate, LocalDate endDate) {

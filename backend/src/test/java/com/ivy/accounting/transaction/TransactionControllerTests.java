@@ -91,6 +91,16 @@ class TransactionControllerTests {
     }
 
     @Test
+    void listCategoriesIncludesPersistedCustomCategory() throws Exception {
+        createTransaction("INCOME", "2026-04-29", 3000, "Freelance", "custom category");
+
+        mockMvc.perform(get("/api/transactions/categories")
+                        .param("type", "INCOME"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.name == 'Freelance')]").exists());
+    }
+
+    @Test
     void listRecentReturnsRequestedLimit() throws Exception {
         createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "第一筆");
         createTransaction("EXPENSE", "2026-04-28", 90, "交通", "第二筆");
@@ -235,6 +245,37 @@ class TransactionControllerTests {
                         .param("endDate", "2026-04-30"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void listCashFlowTrendReturnsMonthlyNetAmountsUntilCurrentMonthForCurrentYear() throws Exception {
+        createTransaction("INCOME", "2026-01-10", 1000, "Salary", "income");
+        createTransaction("EXPENSE", "2026-01-11", 300, "Food", "expense");
+        createTransaction("EXPENSE", "2026-02-11", 200, "Transit", "expense");
+        createTransaction("INCOME", "2025-12-31", 9999, "Salary", "out of range");
+
+        mockMvc.perform(get("/api/transactions/cash-flow-trend")
+                .param("year", "2026"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[0].label").value("2026-01"))
+                .andExpect(jsonPath("$[0].amount").value(700))
+                .andExpect(jsonPath("$[1].label").value("2026-02"))
+                .andExpect(jsonPath("$[1].amount").value(-200))
+                .andExpect(jsonPath("$[2].label").value("2026-03"))
+                .andExpect(jsonPath("$[2].amount").value(0));
+    }
+
+    @Test
+    void listCashFlowTrendReturnsTwelveMonthsForPastYear() throws Exception {
+        createTransaction("INCOME", "2025-12-31", 9999, "Salary", "past year");
+
+        mockMvc.perform(get("/api/transactions/cash-flow-trend")
+                        .param("year", "2025"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(12))
+                .andExpect(jsonPath("$[11].label").value("2025-12"))
+                .andExpect(jsonPath("$[11].amount").value(9999));
     }
 
     @Test

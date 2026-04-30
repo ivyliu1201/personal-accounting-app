@@ -208,6 +208,22 @@ h2 {
   justify-content: space-between;
 }
 
+.segmented {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.segmented button {
+  white-space: nowrap;
+}
+
+.chart-title {
+  color: #52606d;
+  font-size: 12px;
+  font-weight: 600;
+  margin: -10px 0 12px;
+}
+
 .history-controls {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -321,6 +337,7 @@ td {
   width: 100%;
   max-width: 420px;
   min-height: 220px;
+  overflow: visible;
 }
 
 .line-chart.empty {
@@ -332,6 +349,25 @@ td {
   fill: none;
   stroke: #cbd2d9;
   stroke-width: 1.5;
+}
+
+.line-grid-line {
+  stroke: #eef2f6;
+  stroke-width: 1;
+}
+
+.line-zero {
+  stroke: #94a3b8;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.line-guide {
+  stroke: #d9e2ec;
+  stroke-dasharray: 3 4;
+  stroke-width: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
 .line-path {
@@ -348,18 +384,44 @@ td {
   stroke-width: 3;
 }
 
-.line-axis-label {
+.line-data-point:hover .line-guide,
+.line-data-point:focus-within .line-guide {
+  opacity: 1;
+}
+
+.line-axis-tick,
+.line-axis-corner {
   fill: #52606d;
   color: #52606d;
   font-size: 10px;
   font-weight: 700;
 }
 
+.line-axis-tick-y {
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.line-axis-corner {
+  font-size: 11px;
+}
+
 .line-point-value {
+  opacity: 0;
   fill: #1f2933;
   color: #1f2933;
   font-size: 11px;
   font-weight: 700;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: #ffffff;
+  stroke-width: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.line-data-point:hover .line-point-value,
+.line-data-point:focus-within .line-point-value {
+  opacity: 1;
 }
 
 .message {
