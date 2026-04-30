@@ -25,9 +25,13 @@
                 v-model="row.transactionDate"
                 type="date"
                 :max="today"
+                :class="{ empty: !row.transactionDate }"
                 aria-label="日期"
+                @blur="focusedDateRowId = null"
+                @focus="focusedDateRowId = row.id"
+                @input="handleDateInput(row)"
               />
-              <span v-if="!row.transactionDate" class="date-placeholder">未選擇</span>
+              <span v-if="!row.transactionDate && focusedDateRowId !== row.id" class="date-placeholder">未選擇</span>
             </div>
             <input
               v-model.trim="row.amount"
@@ -334,6 +338,7 @@ const isLoadingRecent = ref(false);
 const isLoadingHistory = ref(false);
 const isLoadingSummary = ref(false);
 const message = ref('');
+const focusedDateRowId = ref<number | null>(null);
 
 const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
@@ -394,6 +399,12 @@ function categoriesByType(type: TransactionType | '') {
 function resetCategoryForType(row: EntryRow) {
   row.categoryName = '';
   row.customCategoryName = '';
+}
+
+function handleDateInput(row: EntryRow) {
+  if (!row.transactionDate) {
+    focusedDateRowId.value = null;
+  }
 }
 
 function getCategoryName(row: EntryRow) {

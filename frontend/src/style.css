@@ -145,15 +145,25 @@ h2 {
 }
 
 .date-field {
-  display: grid;
-  gap: 4px;
+  position: relative;
   min-width: 0;
 }
 
 .date-placeholder {
+  position: absolute;
+  left: 9px;
+  top: 50%;
   color: #52606d;
-  font-size: 12px;
-  line-height: 1;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.date-field input.empty:not(:focus) {
+  color: transparent;
+}
+
+.date-field input.empty:not(:focus)::-webkit-datetime-edit {
+  color: transparent;
 }
 
 .icon-button {
