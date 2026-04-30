@@ -206,12 +206,14 @@ public class TransactionService {
         }
 
         List<HistoryTrendPointResponse> responses = new ArrayList<>();
+        BigDecimal cumulativeAmount = BigDecimal.ZERO;
         for (int month = 1; month <= endMonth; month++) {
             BigDecimal amount = amountByMonth.getOrDefault(month, BigDecimal.ZERO);
+            cumulativeAmount = cumulativeAmount.add(amount);
             responses.add(new HistoryTrendPointResponse(
                     YearMonth.of(year, month).toString(),
                     amount,
-                    amount
+                    cumulativeAmount
             ));
         }
         return responses;

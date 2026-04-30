@@ -329,10 +329,13 @@ class TransactionControllerTests {
                 .andExpect(jsonPath("$.length()").value(4))
                 .andExpect(jsonPath("$[0].label").value("2026-01"))
                 .andExpect(jsonPath("$[0].amount").value(700))
+                .andExpect(jsonPath("$[0].cumulativeAmount").value(700))
                 .andExpect(jsonPath("$[1].label").value("2026-02"))
                 .andExpect(jsonPath("$[1].amount").value(-200))
+                .andExpect(jsonPath("$[1].cumulativeAmount").value(500))
                 .andExpect(jsonPath("$[2].label").value("2026-03"))
-                .andExpect(jsonPath("$[2].amount").value(0));
+                .andExpect(jsonPath("$[2].amount").value(0))
+                .andExpect(jsonPath("$[2].cumulativeAmount").value(500));
     }
 
     @Test
@@ -344,7 +347,8 @@ class TransactionControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(12))
                 .andExpect(jsonPath("$[11].label").value("2025-12"))
-                .andExpect(jsonPath("$[11].amount").value(9999));
+                .andExpect(jsonPath("$[11].amount").value(9999))
+                .andExpect(jsonPath("$[11].cumulativeAmount").value(9999));
     }
 
     @Test

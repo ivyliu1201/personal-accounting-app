@@ -84,19 +84,16 @@
       <section class="summary-panel" aria-label="統計資訊">
         <section class="chart-panel">
           <div class="panel-header">
-            <div>
-              <h2>類別占比</h2>
-              <p class="chart-title">{{ summaryChartTitle }}</p>
-            </div>
+            <h2>{{ summaryChartTitle }}</h2>
             <div class="segmented">
               <button type="button" :class="{ active: summaryMode === 'EXPENSE' }" @click="setSummaryMode('EXPENSE')">
-                總支出
+                {{ summaryModeButtonLabel('EXPENSE', summaryPeriodLabel) }}
               </button>
               <button type="button" :class="{ active: summaryMode === 'INCOME' }" @click="setSummaryMode('INCOME')">
-                總收入
+                {{ summaryModeButtonLabel('INCOME', summaryPeriodLabel) }}
               </button>
               <button type="button" :class="{ active: summaryMode === 'CASH_FLOW' }" @click="setSummaryMode('CASH_FLOW')">
-                總現金流
+                {{ summaryModeButtonLabel('CASH_FLOW', summaryPeriodLabel) }}
               </button>
             </div>
           </div>
@@ -124,8 +121,6 @@
             :transactions="recentTransactions"
             :loading="isLoadingRecent"
             empty-label="目前沒有資料"
-            @delete="openDeleteDialog"
-            @edit="openEditDialog"
           />
           <button type="button" @click="showHistory">查看全部</button>
         </section>
@@ -155,6 +150,7 @@
           :transactions="historyTransactions"
           :loading="isLoadingHistory"
           empty-label="查詢區間沒有資料"
+          :show-actions="true"
           @delete="openDeleteDialog"
           @edit="openEditDialog"
         />
@@ -168,32 +164,29 @@
 
       <aside class="history-side-panel">
         <section class="chart-panel history-summary-panel">
-          <div class="panel-header">
-            <div>
-              <h2>類別占比</h2>
-              <p class="chart-title">{{ historySummaryChartTitle }}</p>
-            </div>
+          <div class="panel-header chart-header">
+            <h2>{{ historySummaryChartTitle }}</h2>
             <div class="segmented">
               <button
                 type="button"
                 :class="{ active: historySummaryMode === 'EXPENSE' }"
                 @click="setHistorySummaryMode('EXPENSE')"
               >
-                總支出
+                {{ summaryModeLabel('EXPENSE') }}
               </button>
               <button
                 type="button"
                 :class="{ active: historySummaryMode === 'INCOME' }"
                 @click="setHistorySummaryMode('INCOME')"
               >
-                總收入
+                {{ summaryModeLabel('INCOME') }}
               </button>
               <button
                 type="button"
                 :class="{ active: historySummaryMode === 'CASH_FLOW' }"
                 @click="setHistorySummaryMode('CASH_FLOW')"
               >
-                總現金流
+                {{ summaryModeLabel('CASH_FLOW') }}
               </button>
             </div>
           </div>
@@ -212,47 +205,65 @@
         </section>
 
         <section class="chart-panel history-trend-panel">
-          <div class="panel-header">
+          <div class="panel-header trend-header">
             <div>
-              <h2>現金流折線圖</h2>
+              <h2>現金流趨勢圖</h2>
               <p class="chart-title">{{ historyTrendLabel }}</p>
             </div>
           </div>
 
-          <div v-if="isLoadingHistoryTrend" class="line-chart empty">載入中</div>
-          <div v-else-if="historyTrendPoints.length === 0" class="line-chart empty">查詢年度沒有資料</div>
-          <div v-else class="line-chart" aria-label="年度每月總現金流變化">
-            <svg viewBox="0 0 340 210" role="img">
-              <polyline class="line-grid" :points="lineAxisPoints" />
-              <g v-for="tick in yAxisTicks" :key="tick.value">
-                <line class="line-grid-line" :x1="LINE_CHART_LEFT" :x2="LINE_CHART_RIGHT" :y1="tick.y" :y2="tick.y" />
-                <text class="line-axis-tick line-axis-tick-y" :x="LINE_CHART_LEFT - 8" :y="tick.y + 4" text-anchor="end">
-                  {{ formatCompactCurrency(tick.value) }}
+          <div v-if="isLoadingHistoryTrend" class="trend-chart empty">載入中</div>
+          <div v-else-if="historyTrendPoints.length === 0" class="trend-chart empty">查詢年度沒有資料</div>
+          <div v-else class="trend-chart" aria-label="年度每月總現金流與累積現金流">
+            <div class="trend-legend" aria-hidden="true">
+              <span><i class="legend-bar"></i>每月總現金流</span>
+              <span><i class="legend-line"></i>累積總現金流</span>
+            </div>
+            <svg viewBox="0 0 380 240" role="img">
+              <polyline class="trend-axis" :points="trendAxisPoints" />
+              <g v-for="tick in trendYAxisTicks" :key="tick.value">
+                <line class="trend-grid-line" :x1="TREND_CHART_LEFT" :x2="TREND_CHART_RIGHT" :y1="tick.y" :y2="tick.y" />
+                <text class="trend-axis-tick trend-axis-tick-y" :x="TREND_CHART_LEFT - 8" :y="tick.y + 4" text-anchor="end">
+                  {{ formatSignedCurrency(tick.value) }}
                 </text>
               </g>
               <line
-                v-if="lineZeroY !== null"
-                class="line-zero"
-                :x1="LINE_CHART_LEFT"
-                :x2="LINE_CHART_RIGHT"
-                :y1="lineZeroY"
-                :y2="lineZeroY"
+                class="trend-zero"
+                :x1="TREND_CHART_LEFT"
+                :x2="TREND_CHART_RIGHT"
+                :y1="trendZeroY"
+                :y2="trendZeroY"
               />
-              <polyline class="line-path" :points="historyLinePoints" />
-              <g v-for="point in historyLinePointDetails" :key="point.label" class="line-data-point">
-                <line class="line-guide" :x1="point.x" :x2="point.x" :y1="point.y" :y2="LINE_CHART_BOTTOM" />
-                <text class="line-axis-tick line-axis-tick-x" :x="point.x" :y="LINE_CHART_BOTTOM + 18" text-anchor="middle">
-                  {{ point.axisLabel }}
+              <g v-for="bar in trendBarDetails" :key="bar.label" class="trend-bar-group">
+                <rect
+                  class="trend-bar"
+                  :class="{ negative: bar.value < 0 }"
+                  :x="bar.x"
+                  :y="bar.y"
+                  :width="bar.width"
+                  :height="bar.height"
+                >
+                  <title>{{ bar.label }} 每月總現金流 {{ formatSignedCurrency(bar.value) }}</title>
+                </rect>
+                <line class="trend-guide" :x1="bar.centerX" :x2="bar.centerX" :y1="TREND_CHART_TOP" :y2="TREND_CHART_BOTTOM" />
+                <text class="trend-axis-tick trend-axis-tick-x" :x="bar.centerX" :y="TREND_CHART_BOTTOM + 18" text-anchor="middle">
+                  {{ bar.axisLabel }}
                 </text>
-                <circle class="line-point" :cx="point.x" :cy="point.y" r="4">
-                  <title>{{ point.label }} 總現金流 {{ formatSignedCurrency(point.value) }}</title>
-                </circle>
-                <text class="line-point-value" :x="point.x" :y="point.valueLabelY" text-anchor="middle">
-                  {{ point.axisLabel }} 月 {{ formatCompactCurrency(point.value) }}
+                <text class="trend-bar-value" :x="bar.centerX" :y="bar.valueLabelY" text-anchor="middle">
+                  {{ formatSignedCurrency(bar.value) }}
                 </text>
               </g>
-              <text class="line-axis-corner line-axis-corner-y" :x="LINE_CHART_LEFT - 36" :y="LINE_CHART_TOP - 8">金額</text>
-              <text class="line-axis-corner line-axis-corner-x" :x="LINE_CHART_RIGHT" :y="LINE_CHART_BOTTOM + 36" text-anchor="end">
+              <polyline class="trend-line-path" :points="cumulativeLinePoints" />
+              <g v-for="point in cumulativeLinePointDetails" :key="point.label" class="trend-line-point">
+                <circle class="trend-point" :cx="point.x" :cy="point.y" r="4">
+                  <title>{{ point.label }} 累積總現金流 {{ formatSignedCurrency(point.value) }}</title>
+                </circle>
+                <text class="trend-point-value" :x="point.x" :y="point.valueLabelY" text-anchor="middle">
+                  {{ formatSignedCurrency(point.value) }}
+                </text>
+              </g>
+              <text class="trend-axis-corner trend-axis-corner-y" :x="TREND_CHART_LEFT - 38" :y="TREND_CHART_TOP - 8">金額</text>
+              <text class="trend-axis-corner trend-axis-corner-x" :x="TREND_CHART_RIGHT" :y="TREND_CHART_BOTTOM + 38" text-anchor="end">
                 月份
               </text>
             </svg>
@@ -409,12 +420,24 @@ interface HistoryTrendPointResponse {
   cumulativeAmount: number;
 }
 
-interface LinePoint {
+interface CumulativeLinePoint {
   label: string;
   axisLabel: string;
   value: number;
   x: number;
   y: number;
+  valueLabelY: number;
+}
+
+interface TrendBar {
+  label: string;
+  axisLabel: string;
+  value: number;
+  x: number;
+  y: number;
+  centerX: number;
+  width: number;
+  height: number;
   valueLabelY: number;
 }
 
@@ -429,11 +452,12 @@ const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
 const DONUT_RADIUS = 42;
 const donutCircumference = 2 * Math.PI * DONUT_RADIUS;
 const chartColors = ['#3273dc', '#1f9d55', '#d97706', '#8b5cf6', '#dc2626', '#0891b2', '#4b5563', '#be185d'];
-const LINE_CHART_LEFT = 58;
-const LINE_CHART_RIGHT = 306;
-const LINE_CHART_TOP = 26;
-const LINE_CHART_BOTTOM = 150;
-const lineAxisPoints = `${LINE_CHART_LEFT},${LINE_CHART_TOP} ${LINE_CHART_LEFT},${LINE_CHART_BOTTOM} ${LINE_CHART_RIGHT},${LINE_CHART_BOTTOM}`;
+const TREND_CHART_LEFT = 70;
+const TREND_CHART_RIGHT = 346;
+const TREND_CHART_TOP = 26;
+const TREND_CHART_BOTTOM = 170;
+const TREND_TICK_STEP = 4000;
+const trendAxisPoints = `${TREND_CHART_LEFT},${TREND_CHART_TOP} ${TREND_CHART_LEFT},${TREND_CHART_BOTTOM} ${TREND_CHART_RIGHT},${TREND_CHART_BOTTOM}`;
 
 const today = new Date().toISOString().slice(0, 10);
 const defaultHistoryStartDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -492,7 +516,9 @@ const summaryExpenseTotal = computed(() => sumSummaries(expenseCategorySummaries
 const historyIncomeTotal = computed(() => sumSummaries(historyIncomeCategorySummaries.value));
 const historyExpenseTotal = computed(() => sumSummaries(historyExpenseCategorySummaries.value));
 const historyTrendYear = computed(() => Number(historyStartDate.value.slice(0, 4)));
-const historyTrendLabel = computed(() => `${historyTrendYear.value} 年每月總現金流變化`);
+const summaryPeriodLabel = computed(() => formatRangeLabel(defaultHistoryStartDate, today));
+const historyPeriodLabel = computed(() => formatRangeLabel(historyStartDate.value, historyEndDate.value));
+const historyTrendLabel = computed(() => `${historyTrendYear.value} 年每月總現金流與累積總現金流`);
 
 const activeSummaryRows = computed(() => getSummaryRows(
   summaryMode.value,
@@ -508,48 +534,20 @@ const summaryCenterLabel = computed(() => summaryMode.value === 'CASH_FLOW' ? '�
 const historySummaryCenterLabel = computed(() => historySummaryMode.value === 'CASH_FLOW' ? '現金流' : typeLabel(historySummaryMode.value));
 const summaryCenterAmount = computed(() => getCenterAmount(summaryMode.value, summaryExpenseTotal.value, summaryIncomeTotal.value));
 const historySummaryCenterAmount = computed(() => getCenterAmount(historySummaryMode.value, historyExpenseTotal.value, historyIncomeTotal.value));
-const summaryChartTitle = computed(() => `近 30 天${summaryModeLabel(summaryMode.value)}圓餅圖`);
-const historySummaryChartTitle = computed(() => `${formatRangeLabel(historyStartDate.value, historyEndDate.value)}${summaryModeLabel(historySummaryMode.value)}圓餅圖`);
+const summaryChartTitle = computed(() => `${summaryPeriodLabel.value}${summaryModeLabel(summaryMode.value)}圓餅圖`);
+const historySummaryChartTitle = computed(() => `${historyPeriodLabel.value}${summaryModeLabel(historySummaryMode.value)}圓餅圖`);
 const donutSegments = computed(() => buildDonutSegments(activeSummaryRows.value));
 const historyDonutSegments = computed(() => buildDonutSegments(activeHistorySummaryRows.value));
-const historyTrendValues = computed(() => historyTrendPoints.value.map((point) => point.amount));
-const lineMinValue = computed(() => getLineRange().min);
-const lineMaxValue = computed(() => getLineRange().max);
-const lineZeroY = computed(() => scaleLineValue(0));
-const yAxisTicks = computed<AxisTick[]>(() => {
-  const minValue = lineMinValue.value;
-  const maxValue = lineMaxValue.value;
-  const tickCount = 5;
-  const step = (maxValue - minValue) / (tickCount - 1);
-
-  return Array.from({ length: tickCount }, (_, index) => {
-    const value = minValue + (step * index);
-    return {
-      value: Math.round(value),
-      y: scaleLineValue(value) ?? LINE_CHART_BOTTOM
-    };
-  }).reverse();
-});
-const historyLinePointDetails = computed<LinePoint[]>(() => {
-  const xRange = LINE_CHART_RIGHT - LINE_CHART_LEFT;
-  const lastIndex = Math.max(historyTrendPoints.value.length - 1, 1);
-
-  return historyTrendPoints.value.map((point, index) => {
-    const value = point.amount;
-    const x = LINE_CHART_LEFT + (xRange * index / lastIndex);
-    const y = scaleLineValue(value) ?? LINE_CHART_BOTTOM;
-    const valueLabelY = y < LINE_CHART_TOP + 18 ? y + 18 : y - 10;
-    return {
-      label: point.label,
-      axisLabel: formatTrendMonth(point.label),
-      value,
-      x,
-      y,
-      valueLabelY
-    };
-  });
-});
-const historyLinePoints = computed(() => historyLinePointDetails.value
+const trendValues = computed(() => historyTrendPoints.value.flatMap((point) => [
+  point.amount,
+  point.cumulativeAmount
+]));
+const trendRange = computed(() => getTrendRange(trendValues.value));
+const trendZeroY = computed(() => scaleTrendValue(0));
+const trendYAxisTicks = computed<AxisTick[]>(() => buildTrendYAxisTicks(trendRange.value));
+const trendBarDetails = computed<TrendBar[]>(() => buildTrendBars(historyTrendPoints.value));
+const cumulativeLinePointDetails = computed<CumulativeLinePoint[]>(() => buildCumulativeLinePoints(historyTrendPoints.value));
+const cumulativeLinePoints = computed(() => cumulativeLinePointDetails.value
   .map((point) => `${point.x},${point.y}`)
   .join(' '));
 
@@ -557,35 +555,46 @@ const TransactionsTable = defineComponent({
   props: {
     transactions: { type: Array as PropType<TransactionResponse[]>, required: true },
     loading: { type: Boolean, required: true },
-    emptyLabel: { type: String, required: true }
+    emptyLabel: { type: String, required: true },
+    showActions: { type: Boolean, default: false }
   },
   emits: {
     edit: (transaction: TransactionResponse) => Boolean(transaction),
     delete: (transaction: TransactionResponse) => Boolean(transaction)
   },
   setup(props, { emit }) {
+    const columnCount = props.showActions ? 7 : 6;
+    const headerCells = [
+      h('th', '日期'),
+      h('th', '類型'),
+      h('th', '類別'),
+      h('th', '金額'),
+      h('th', '備註'),
+      h('th', '建立時間')
+    ];
+    if (props.showActions) {
+      headerCells.push(h('th', '操作'));
+    }
+
     return () => h('table', [
       h('thead', h('tr', [
-        h('th', '日期'),
-        h('th', '類型'),
-        h('th', '類別'),
-        h('th', '金額'),
-        h('th', '備註'),
-        h('th', '建立時間'),
-        h('th', '操作')
+        ...headerCells
       ])),
       h('tbody', props.loading
-        ? h('tr', h('td', { colspan: 7 }, '載入中'))
+        ? h('tr', h('td', { colspan: columnCount }, '載入中'))
         : props.transactions.length === 0
-          ? h('tr', h('td', { colspan: 7 }, props.emptyLabel))
-          : props.transactions.map((transaction) => h('tr', { key: transaction.id }, [
+          ? h('tr', h('td', { colspan: columnCount }, props.emptyLabel))
+          : props.transactions.map((transaction) => {
+            const rowCells = [
             h('td', transaction.transactionDate),
             h('td', typeLabel(transaction.type)),
             h('td', transaction.categoryName),
             h('td', formatAmount(transaction.amount)),
             h('td', { class: 'truncate' }, truncateNote(transaction.note)),
-            h('td', formatDateTime(transaction.createdAt)),
-            h('td', h('div', { class: 'row-actions' }, [
+            h('td', formatDateTime(transaction.createdAt))
+            ];
+            if (props.showActions) {
+              rowCells.push(h('td', h('div', { class: 'row-actions' }, [
               h('button', {
                 type: 'button',
                 class: 'square-action edit-action',
@@ -600,8 +609,10 @@ const TransactionsTable = defineComponent({
                 'aria-label': '刪除',
                 onClick: () => emit('delete', transaction)
               }, [renderTrashIcon()])
-            ]))
-          ]))
+              ])));
+            }
+            return h('tr', { key: transaction.id }, rowCells);
+          })
       )
     ]);
   }
@@ -1247,27 +1258,86 @@ function calculatePercentage(amount: number, total: number) {
   return Number(((amount / total) * 100).toFixed(2));
 }
 
-function getLineRange() {
-  const values = historyTrendValues.value;
+function getTrendRange(values: number[]) {
   const rawMin = Math.min(...values, 0);
   const rawMax = Math.max(...values, 0);
-  const spread = rawMax - rawMin;
-  const padding = spread === 0 ? 1 : spread * 0.12;
+  const min = Math.min(0, Math.floor(rawMin / TREND_TICK_STEP) * TREND_TICK_STEP);
+  let max = Math.max(0, Math.ceil(rawMax / TREND_TICK_STEP) * TREND_TICK_STEP);
+
+  if (max === min) {
+    max = TREND_TICK_STEP;
+  }
 
   return {
-    min: rawMin - padding,
-    max: rawMax + padding
+    min,
+    max
   };
 }
 
-function scaleLineValue(value: number) {
-  const minValue = lineMinValue.value;
-  const maxValue = lineMaxValue.value;
+function scaleTrendValue(value: number) {
+  const { min: minValue, max: maxValue } = trendRange.value;
   if (maxValue === minValue) {
-    return (LINE_CHART_TOP + LINE_CHART_BOTTOM) / 2;
+    return TREND_CHART_BOTTOM;
   }
-  const yRange = LINE_CHART_BOTTOM - LINE_CHART_TOP;
-  return LINE_CHART_BOTTOM - ((value - minValue) / (maxValue - minValue) * yRange);
+  const yRange = TREND_CHART_BOTTOM - TREND_CHART_TOP;
+  return TREND_CHART_BOTTOM - ((value - minValue) / (maxValue - minValue) * yRange);
+}
+
+function buildTrendYAxisTicks(range: { min: number; max: number }) {
+  const ticks: AxisTick[] = [];
+  for (let value = range.min; value <= range.max; value += TREND_TICK_STEP) {
+    ticks.push({
+      value,
+      y: scaleTrendValue(value)
+    });
+  }
+  return ticks.reverse();
+}
+
+function buildTrendBars(points: HistoryTrendPointResponse[]) {
+  const zeroY = trendZeroY.value;
+  const slotWidth = (TREND_CHART_RIGHT - TREND_CHART_LEFT) / Math.max(points.length, 1);
+  const barWidth = Math.min(18, Math.max(10, slotWidth * 0.46));
+
+  return points.map((point, index) => {
+    const centerX = TREND_CHART_LEFT + (slotWidth * index) + (slotWidth / 2);
+    const valueY = scaleTrendValue(point.amount);
+    const y = Math.min(valueY, zeroY);
+    const height = Math.max(Math.abs(zeroY - valueY), 2);
+    const valueLabelY = point.amount >= 0 ? Math.max(y - 7, TREND_CHART_TOP + 8) : y + height + 14;
+
+    return {
+      label: point.label,
+      axisLabel: formatTrendMonth(point.label),
+      value: point.amount,
+      x: centerX - (barWidth / 2),
+      y,
+      centerX,
+      width: barWidth,
+      height,
+      valueLabelY
+    };
+  });
+}
+
+function buildCumulativeLinePoints(points: HistoryTrendPointResponse[]) {
+  const slotWidth = (TREND_CHART_RIGHT - TREND_CHART_LEFT) / Math.max(points.length, 1);
+
+  return points.map((point, index) => {
+    const value = point.cumulativeAmount;
+    const x = TREND_CHART_LEFT + (slotWidth * index) + (slotWidth / 2);
+    const y = scaleTrendValue(value);
+    const valueLabelY = y < TREND_CHART_TOP + 18 ? y + 20 : y - 10;
+
+    return {
+      label: point.label,
+      axisLabel: formatTrendMonth(point.label),
+      value,
+      x,
+      y,
+      valueLabelY
+    };
+  });
 }
 
 function formatTrendMonth(label: string) {
@@ -1285,16 +1355,20 @@ function summaryModeLabel(mode: SummaryMode) {
   return '總現金流';
 }
 
+function summaryModeButtonLabel(mode: SummaryMode, periodLabel: string) {
+  return `${periodLabel}${summaryModeLabel(mode)}`;
+}
+
 function formatRangeLabel(startDate: string, endDate: string) {
   const start = new Date(`${startDate}T00:00:00`);
   const end = new Date(`${endDate}T00:00:00`);
   const startMonth = start.getMonth() + 1;
   const endMonth = end.getMonth() + 1;
   if (start.getFullYear() === end.getFullYear() && startMonth === endMonth) {
-    return `${startMonth} 月`;
+    return `${startMonth}月`;
   }
   if (start.getFullYear() === end.getFullYear()) {
-    return `${startMonth}-${endMonth} 月`;
+    return `${startMonth}-${endMonth}月`;
   }
   return `${start.getFullYear()}/${startMonth}-${end.getFullYear()}/${endMonth}`;
 }
@@ -1310,15 +1384,6 @@ function formatAmount(amount: number) {
 function formatSignedCurrency(amount: number) {
   const prefix = amount < 0 ? '-' : '';
   return `${prefix}$${formatAmount(Math.abs(amount))}`;
-}
-
-function formatCompactCurrency(amount: number) {
-  const absoluteAmount = Math.abs(amount);
-  const prefix = amount < 0 ? '-' : '';
-  if (absoluteAmount >= 10000) {
-    return `${prefix}$${new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 1 }).format(absoluteAmount / 10000)}萬`;
-  }
-  return `${prefix}$${formatAmount(absoluteAmount)}`;
 }
 
 function formatPercentage(percentage: number) {
