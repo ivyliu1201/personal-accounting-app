@@ -3,8 +3,10 @@ package com.ivy.accounting.transaction;
 import com.ivy.accounting.auth.CurrentUserProvider;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -65,6 +67,32 @@ public class TransactionService {
         String userId = currentUserProvider.getCurrentUserId();
         int limit = normalizeRecentLimit(requestedLimit);
         return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
+    }
+
+    @Transactional
+    public AccountingTransaction updateTransaction(UUID id, UpdateTransactionRequest request) {
+        String userId = currentUserProvider.getCurrentUserId();
+        AccountingTransaction transaction = getRequiredTransaction(id, userId);
+        Category category = getOrCreateCategory(
+                userId,
+                request.type(),
+                request.categoryName(),
+                OffsetDateTime.now(clock)
+        );
+
+        transaction.setType(request.type());
+        transaction.setTransactionDate(request.transactionDate());
+        transaction.setAmount(request.amount());
+        transaction.setCategory(category);
+        transaction.setNote(normalizeNote(request.note()));
+        return transactionRepository.save(transaction);
+    }
+
+    @Transactional
+    public void deleteTransaction(UUID id) {
+        String userId = currentUserProvider.getCurrentUserId();
+        AccountingTransaction transaction = getRequiredTransaction(id, userId);
+        transactionRepository.delete(transaction);
     }
 
     @Transactional(readOnly = true)
@@ -215,9 +243,23 @@ public class TransactionService {
     }
 
     private Category getOrCreateCategory(String userId, CreateTransactionRequest request, OffsetDateTime now) {
-        String categoryName = request.categoryName().trim();
-        return categoryRepository.getVisibleCategory(userId, request.type(), categoryName)
-                .orElseGet(() -> categoryRepository.save(buildCustomCategory(userId, request.type(), categoryName, now)));
+        return getOrCreateCategory(userId, request.type(), request.categoryName(), now);
+    }
+
+    private Category getOrCreateCategory(
+            String userId,
+            TransactionType type,
+            String requestedCategoryName,
+            OffsetDateTime now
+    ) {
+        String categoryName = requestedCategoryName.trim();
+        return categoryRepository.getVisibleCategory(userId, type, categoryName)
+                .orElseGet(() -> categoryRepository.save(buildCustomCategory(userId, type, categoryName, now)));
+    }
+
+    private AccountingTransaction getRequiredTransaction(UUID id, String userId) {
+        return transactionRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
     }
 
     private Category buildCustomCategory(String userId, TransactionType type, String name, OffsetDateTime now) {

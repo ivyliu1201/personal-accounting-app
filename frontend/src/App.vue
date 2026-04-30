@@ -120,7 +120,13 @@
             </select>
           </div>
 
-          <TransactionsTable :transactions="recentTransactions" :loading="isLoadingRecent" empty-label="目前沒有資料" />
+          <TransactionsTable
+            :transactions="recentTransactions"
+            :loading="isLoadingRecent"
+            empty-label="目前沒有資料"
+            @delete="openDeleteDialog"
+            @edit="openEditDialog"
+          />
           <button type="button" @click="showHistory">查看全部</button>
         </section>
       </section>
@@ -145,7 +151,13 @@
           </div>
         </div>
 
-        <TransactionsTable :transactions="historyTransactions" :loading="isLoadingHistory" empty-label="查詢區間沒有資料" />
+        <TransactionsTable
+          :transactions="historyTransactions"
+          :loading="isLoadingHistory"
+          empty-label="查詢區間沒有資料"
+          @delete="openDeleteDialog"
+          @edit="openEditDialog"
+        />
 
         <div class="pager">
           <button type="button" :disabled="historyPage === 0 || isLoadingHistory" @click="previousHistoryPage">上一頁</button>
@@ -249,6 +261,85 @@
       </aside>
     </section>
 
+    <div v-if="editingTransaction" class="modal-backdrop" role="presentation">
+      <section class="modal" role="dialog" aria-modal="true" aria-label="編輯帳目">
+        <h2>編輯帳目</h2>
+        <div class="modal-form">
+          <label>
+            <span>收入 / 支出</span>
+            <select v-model="editForm.type" @change="resetEditCategory">
+              <option value="EXPENSE">支出</option>
+              <option value="INCOME">收入</option>
+            </select>
+          </label>
+          <label>
+            <span>日期</span>
+            <input v-model="editForm.transactionDate" type="date" :max="today" />
+          </label>
+          <label>
+            <span>金額</span>
+            <input
+              v-model.trim="editForm.amount"
+              type="text"
+              inputmode="decimal"
+              pattern="[0-9]*\\.?[0-9]*"
+              @input="normalizeEditAmount"
+            />
+          </label>
+          <label>
+            <span>類別</span>
+            <select v-model="editForm.categoryName" @change="resetEditCustomCategory">
+              <option v-for="category in categoriesByType(editForm.type)" :key="category" :value="category">
+                {{ category }}
+              </option>
+              <option :value="CUSTOM_CATEGORY_VALUE">自訂類別</option>
+            </select>
+          </label>
+          <label v-if="editForm.categoryName === CUSTOM_CATEGORY_VALUE">
+            <span>自訂類別</span>
+            <input v-model.trim="editForm.customCategoryName" type="text" maxlength="64" />
+          </label>
+          <label>
+            <span>備註</span>
+            <input v-model.trim="editForm.note" type="text" maxlength="255" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" @click="closeEditDialog">取消</button>
+          <button type="button" :disabled="!canSubmitEdit || isSavingEdit" @click="submitEdit">
+            {{ isSavingEdit ? '儲存中' : '確定' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="deletingTransaction" class="modal-backdrop" role="presentation">
+      <section class="modal" role="dialog" aria-modal="true" aria-label="確認刪除">
+        <h2>確認刪除</h2>
+        <dl class="delete-summary">
+          <div>
+            <dt>日期</dt>
+            <dd>{{ deletingTransaction.transactionDate }}</dd>
+          </div>
+          <div>
+            <dt>類別</dt>
+            <dd>{{ deletingTransaction.categoryName }}</dd>
+          </div>
+          <div>
+            <dt>金額</dt>
+            <dd>{{ formatAmount(deletingTransaction.amount) }}</dd>
+          </div>
+        </dl>
+        <p class="delete-message">確定要刪除此筆資料嗎？</p>
+        <div class="modal-actions">
+          <button type="button" @click="closeDeleteDialog">取消</button>
+          <button type="button" class="danger-button" :disabled="isDeleting" @click="confirmDelete">
+            {{ isDeleting ? '刪除中' : '確認刪除' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
     <p v-if="message" class="message" role="status">{{ message }}</p>
   </main>
 </template>
@@ -263,6 +354,15 @@ type SummaryMode = TransactionType | 'CASH_FLOW';
 interface EntryRow {
   id: number;
   type: TransactionType | '';
+  transactionDate: string;
+  amount: string;
+  categoryName: string;
+  customCategoryName: string;
+  note: string;
+}
+
+interface EditForm {
+  type: TransactionType;
   transactionDate: string;
   amount: string;
   categoryName: string;
@@ -369,11 +469,23 @@ const isLoadingHistorySummary = ref(false);
 const isLoadingHistoryTrend = ref(false);
 const message = ref('');
 const focusedDateRowId = ref<number | null>(null);
+const editingTransaction = ref<TransactionResponse | null>(null);
+const deletingTransaction = ref<TransactionResponse | null>(null);
+const editForm = ref<EditForm>(createEditForm());
+const isSavingEdit = ref(false);
+const isDeleting = ref(false);
 
 const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
   return row.type && row.transactionDate && amount > 0 && getCategoryName(row);
 }));
+const canSubmitEdit = computed(() => {
+  const amount = Number(editForm.value.amount);
+  return Boolean(editForm.value.type)
+    && Boolean(editForm.value.transactionDate)
+    && amount > 0
+    && Boolean(getEditCategoryName());
+});
 
 const summaryIncomeTotal = computed(() => sumSummaries(incomeCategorySummaries.value));
 const summaryExpenseTotal = computed(() => sumSummaries(expenseCategorySummaries.value));
@@ -447,7 +559,11 @@ const TransactionsTable = defineComponent({
     loading: { type: Boolean, required: true },
     emptyLabel: { type: String, required: true }
   },
-  setup(props) {
+  emits: {
+    edit: (transaction: TransactionResponse) => Boolean(transaction),
+    delete: (transaction: TransactionResponse) => Boolean(transaction)
+  },
+  setup(props, { emit }) {
     return () => h('table', [
       h('thead', h('tr', [
         h('th', '日期'),
@@ -455,19 +571,36 @@ const TransactionsTable = defineComponent({
         h('th', '類別'),
         h('th', '金額'),
         h('th', '備註'),
-        h('th', '建立時間')
+        h('th', '建立時間'),
+        h('th', '操作')
       ])),
       h('tbody', props.loading
-        ? h('tr', h('td', { colspan: 6 }, '載入中'))
+        ? h('tr', h('td', { colspan: 7 }, '載入中'))
         : props.transactions.length === 0
-          ? h('tr', h('td', { colspan: 6 }, props.emptyLabel))
+          ? h('tr', h('td', { colspan: 7 }, props.emptyLabel))
           : props.transactions.map((transaction) => h('tr', { key: transaction.id }, [
             h('td', transaction.transactionDate),
             h('td', typeLabel(transaction.type)),
             h('td', transaction.categoryName),
             h('td', formatAmount(transaction.amount)),
             h('td', { class: 'truncate' }, truncateNote(transaction.note)),
-            h('td', formatDateTime(transaction.createdAt))
+            h('td', formatDateTime(transaction.createdAt)),
+            h('td', h('div', { class: 'row-actions' }, [
+              h('button', {
+                type: 'button',
+                class: 'square-action edit-action',
+                title: '編輯',
+                'aria-label': '編輯',
+                onClick: () => emit('edit', transaction)
+              }, [renderPencilIcon()]),
+              h('button', {
+                type: 'button',
+                class: 'square-action delete-action',
+                title: '刪除',
+                'aria-label': '刪除',
+                onClick: () => emit('delete', transaction)
+              }, [renderTrashIcon()])
+            ]))
           ]))
       )
     ]);
@@ -559,6 +692,45 @@ function createRow(): EntryRow {
   };
 }
 
+function createEditForm(): EditForm {
+  return {
+    type: 'EXPENSE',
+    transactionDate: '',
+    amount: '',
+    categoryName: '',
+    customCategoryName: '',
+    note: ''
+  };
+}
+
+function renderPencilIcon() {
+  return h('svg', {
+    viewBox: '0 0 24 24',
+    'aria-hidden': 'true'
+  }, [
+    h('path', {
+      d: 'M4 17.25V20h2.75L17.81 8.94l-2.75-2.75L4 17.25z'
+    }),
+    h('path', {
+      d: 'M19.71 7.04a1 1 0 0 0 0-1.41l-1.34-1.34a1 1 0 0 0-1.41 0l-1.05 1.05 2.75 2.75 1.05-1.05z'
+    })
+  ]);
+}
+
+function renderTrashIcon() {
+  return h('svg', {
+    viewBox: '0 0 24 24',
+    'aria-hidden': 'true'
+  }, [
+    h('path', {
+      d: 'M7 21c-1.1 0-2-.9-2-2V8h14v11c0 1.1-.9 2-2 2H7z'
+    }),
+    h('path', {
+      d: 'M9 4h6l1 2h4v2H4V6h4l1-2z'
+    })
+  ]);
+}
+
 function addRow() {
   rows.value.push(createRow());
 }
@@ -646,6 +818,151 @@ async function submitBatch() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+function openEditDialog(transaction: TransactionResponse) {
+  editingTransaction.value = transaction;
+  editForm.value = {
+    type: transaction.type,
+    transactionDate: transaction.transactionDate,
+    amount: String(transaction.amount),
+    categoryName: getInitialEditCategoryName(transaction),
+    customCategoryName: categoriesByType(transaction.type).includes(transaction.categoryName) ? '' : transaction.categoryName,
+    note: transaction.note ?? ''
+  };
+}
+
+function closeEditDialog() {
+  if (isSavingEdit.value) {
+    return;
+  }
+  editingTransaction.value = null;
+  editForm.value = createEditForm();
+}
+
+function resetEditCategory() {
+  editForm.value.categoryName = '';
+  editForm.value.customCategoryName = '';
+}
+
+function resetEditCustomCategory() {
+  if (editForm.value.categoryName !== CUSTOM_CATEGORY_VALUE) {
+    editForm.value.customCategoryName = '';
+  }
+}
+
+function normalizeEditAmount() {
+  editForm.value.amount = editForm.value.amount.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+}
+
+async function submitEdit() {
+  if (!editingTransaction.value || isSavingEdit.value || !canSubmitEdit.value) {
+    return;
+  }
+
+  isSavingEdit.value = true;
+  try {
+    const response = await fetch(`/api/transactions/${editingTransaction.value.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        type: editForm.value.type,
+        transactionDate: editForm.value.transactionDate,
+        amount: Number(editForm.value.amount),
+        categoryName: getEditCategoryName(),
+        note: editForm.value.note.trim() || null
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, '更新失敗，請確認欄位內容'));
+    }
+
+    editingTransaction.value = null;
+    editForm.value = createEditForm();
+    await refreshAfterMutation();
+    showMessage('更新完成');
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '更新失敗');
+  } finally {
+    isSavingEdit.value = false;
+  }
+}
+
+function openDeleteDialog(transaction: TransactionResponse) {
+  deletingTransaction.value = transaction;
+}
+
+function closeDeleteDialog() {
+  if (isDeleting.value) {
+    return;
+  }
+  deletingTransaction.value = null;
+}
+
+async function confirmDelete() {
+  if (!deletingTransaction.value || isDeleting.value) {
+    return;
+  }
+
+  const deletedFromHistoryLastRow = currentView.value === 'history'
+    && historyTransactions.value.length === 1
+    && historyPage.value > 0;
+
+  isDeleting.value = true;
+  try {
+    const response = await fetch(`/api/transactions/${deletingTransaction.value.id}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, '刪除失敗，請稍後再試'));
+    }
+
+    deletingTransaction.value = null;
+    if (deletedFromHistoryLastRow) {
+      historyPage.value -= 1;
+    }
+    await refreshAfterMutation();
+    showMessage('刪除完成');
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '刪除失敗');
+  } finally {
+    isDeleting.value = false;
+  }
+}
+
+function getInitialEditCategoryName(transaction: TransactionResponse) {
+  return categoriesByType(transaction.type).includes(transaction.categoryName)
+    ? transaction.categoryName
+    : CUSTOM_CATEGORY_VALUE;
+}
+
+function getEditCategoryName() {
+  if (editForm.value.categoryName === CUSTOM_CATEGORY_VALUE) {
+    return editForm.value.customCategoryName.trim();
+  }
+  return editForm.value.categoryName.trim();
+}
+
+async function refreshAfterMutation() {
+  if (currentView.value === 'history') {
+    await Promise.all([
+      loadHistory(),
+      loadHistoryCategorySummary(),
+      loadHistoryTrend(),
+      loadCategories(false)
+    ]);
+    return;
+  }
+
+  await Promise.all([
+    loadRecent(false),
+    loadCategorySummary(false),
+    loadCategories(false)
+  ]);
 }
 
 function setSummaryMode(mode: SummaryMode) {

@@ -15,10 +15,13 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -110,6 +113,72 @@ class TransactionControllerTests {
                         .param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void updateTransactionChangesEditableFieldsAndPersistsCustomCategory() throws Exception {
+        String transactionId = createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "before");
+        String requestBody = """
+                {
+                  "type": "INCOME",
+                  "transactionDate": "2026-04-28",
+                  "amount": 1200,
+                  "categoryName": "Bonus",
+                  "note": "after"
+                }
+                """;
+
+        mockMvc.perform(put("/api/transactions/{id}", transactionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(transactionId))
+                .andExpect(jsonPath("$.type").value("INCOME"))
+                .andExpect(jsonPath("$.transactionDate").value("2026-04-28"))
+                .andExpect(jsonPath("$.amount").value(1200))
+                .andExpect(jsonPath("$.categoryName").value("Bonus"))
+                .andExpect(jsonPath("$.note").value("after"));
+
+        AccountingTransaction updatedTransaction = transactionRepository
+                .findByIdAndUserId(UUID.fromString(transactionId), "dev-user")
+                .orElseThrow();
+        assertThat(updatedTransaction.getType()).isEqualTo(TransactionType.INCOME);
+        assertThat(updatedTransaction.getCategory().getName()).isEqualTo("Bonus");
+        assertThat(updatedTransaction.getCreatedAt()).isNotNull();
+        assertThat(categoryRepository.findAll()).anySatisfy(category -> {
+            assertThat(category.getName()).isEqualTo("Bonus");
+            assertThat(category.getType()).isEqualTo(TransactionType.INCOME);
+            assertThat(category.isDefaultCategory()).isFalse();
+        });
+    }
+
+    @Test
+    void updateTransactionRejectsInvalidFields() throws Exception {
+        String transactionId = createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "before");
+        String requestBody = """
+                {
+                  "type": "EXPENSE",
+                  "transactionDate": "2999-01-01",
+                  "amount": 0,
+                  "categoryName": "",
+                  "note": "invalid"
+                }
+                """;
+
+        mockMvc.perform(put("/api/transactions/{id}", transactionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteTransactionRemovesOnlyRequestedUserTransaction() throws Exception {
+        String transactionId = createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "delete me");
+
+        mockMvc.perform(delete("/api/transactions/{id}", transactionId))
+                .andExpect(status().isOk());
+
+        assertThat(transactionRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -309,7 +378,7 @@ class TransactionControllerTests {
      * 輸出：無，成功後資料會寫入測試資料庫。
      * 可能錯誤：API 驗證或持久化失敗時拋出測試例外。
      */
-    private void createTransaction(
+    private String createTransaction(
             String type,
             String transactionDate,
             int amount,
@@ -330,10 +399,14 @@ class TransactionControllerTests {
                 }
                 """.formatted(type, transactionDate, amount, categoryName, note);
 
-        mockMvc.perform(post("/api/transactions/batch")
+        String responseBody = mockMvc.perform(post("/api/transactions/batch")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return responseBody.split("\"id\":\"")[1].split("\"")[0];
     }
 
     @TestConfiguration

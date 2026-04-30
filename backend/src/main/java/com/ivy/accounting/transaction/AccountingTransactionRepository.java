@@ -9,12 +9,16 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface AccountingTransactionRepository extends JpaRepository<AccountingTransaction, UUID> {
 
     @EntityGraph(attributePaths = "category")
     List<AccountingTransaction> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "category")
+    Optional<AccountingTransaction> findByIdAndUserId(UUID id, String userId);
 
     @EntityGraph(attributePaths = "category")
     Slice<AccountingTransaction> findByUserIdAndTypeAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
