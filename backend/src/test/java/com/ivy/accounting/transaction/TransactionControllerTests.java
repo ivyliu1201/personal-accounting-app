@@ -182,7 +182,7 @@ class TransactionControllerTests {
     }
 
     @Test
-    void listHistoryTrendReturnsMonthlyAmountsAndCumulativeAmounts() throws Exception {
+    void listHistoryTrendReturnsMonthlyCumulativeAmountsForCrossMonthRange() throws Exception {
         createTransaction("EXPENSE", "2026-02-28", 999, "Food", "out of range");
         createTransaction("EXPENSE", "2026-03-01", 100, "Food", "march");
         createTransaction("EXPENSE", "2026-03-15", 50, "Food", "march");
@@ -195,10 +195,32 @@ class TransactionControllerTests {
                         .param("endDate", "2026-04-30"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].month").value("2026-03"))
+                .andExpect(jsonPath("$[0].label").value("2026-03"))
                 .andExpect(jsonPath("$[0].amount").value(150))
                 .andExpect(jsonPath("$[0].cumulativeAmount").value(150))
-                .andExpect(jsonPath("$[1].month").value("2026-04"))
+                .andExpect(jsonPath("$[1].label").value("2026-04"))
+                .andExpect(jsonPath("$[1].amount").value(70))
+                .andExpect(jsonPath("$[1].cumulativeAmount").value(220));
+    }
+
+    @Test
+    void listHistoryTrendReturnsDailyCumulativeAmountsForSameMonthRange() throws Exception {
+        createTransaction("EXPENSE", "2026-04-01", 100, "Food", "first day");
+        createTransaction("EXPENSE", "2026-04-01", 50, "Transit", "same day");
+        createTransaction("EXPENSE", "2026-04-03", 70, "Food", "third day");
+        createTransaction("EXPENSE", "2026-04-29", 999, "Food", "out of range");
+        createTransaction("INCOME", "2026-04-03", 1000, "Salary", "income");
+
+        mockMvc.perform(get("/api/transactions/history-trend")
+                        .param("type", "EXPENSE")
+                        .param("startDate", "2026-04-01")
+                        .param("endDate", "2026-04-28"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].label").value("2026-04-01"))
+                .andExpect(jsonPath("$[0].amount").value(150))
+                .andExpect(jsonPath("$[0].cumulativeAmount").value(150))
+                .andExpect(jsonPath("$[1].label").value("2026-04-03"))
                 .andExpect(jsonPath("$[1].amount").value(70))
                 .andExpect(jsonPath("$[1].cumulativeAmount").value(220));
     }

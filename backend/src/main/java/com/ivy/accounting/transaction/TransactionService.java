@@ -65,13 +65,6 @@ public class TransactionService {
         return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
     }
 
-    /**
-     * 查詢歷史查看頁的日期區間明細。
-     *
-     * 輸入：收支類型、起訖日期、頁碼與每頁筆數。
-     * 輸出：依交易日期與建立時間倒序排列的明細分頁。
-     * 可能錯誤：日期區間無法由資料庫處理時拋出資料存取例外。
-     */
     @Transactional(readOnly = true)
     public HistoryTransactionsResponse listHistory(
             TransactionType type,
@@ -99,13 +92,6 @@ public class TransactionService {
         return new HistoryTransactionsResponse(responseTransactions, page, size, transactions.hasNext());
     }
 
-    /**
-     * 查詢首頁近 30 天類別摘要。
-     *
-     * 輸入：收入或支出類型。
-     * 輸出：依金額由大到小排序的類別摘要清單。
-     * 可能錯誤：資料庫查詢失敗時拋出資料存取例外。
-     */
     @Transactional(readOnly = true)
     public List<CategorySummaryResponse> listCategorySummaries(
             TransactionType type,
@@ -141,25 +127,37 @@ public class TransactionService {
             LocalDate endDate
     ) {
         String userId = currentUserProvider.getCurrentUserId();
-        List<HistoryTrendPointProjection> trendPoints = transactionRepository.listHistoryTrend(
-                userId,
-                type,
-                startDate,
-                endDate
-        );
+        List<HistoryTrendPointProjection> trendPoints = isSameMonth(startDate, endDate)
+                ? transactionRepository.listDailyHistoryTrend(userId, type, startDate, endDate)
+                : transactionRepository.listMonthlyHistoryTrend(userId, type, startDate, endDate);
         BigDecimal cumulativeAmount = BigDecimal.ZERO;
         List<HistoryTrendPointResponse> responses = new ArrayList<>();
 
         for (HistoryTrendPointProjection trendPoint : trendPoints) {
             cumulativeAmount = cumulativeAmount.add(trendPoint.getAmount());
             responses.add(new HistoryTrendPointResponse(
-                    formatTrendMonth(trendPoint),
+                    formatTrendLabel(startDate, endDate, trendPoint),
                     trendPoint.getAmount(),
                     cumulativeAmount
             ));
         }
 
         return responses;
+    }
+
+    private boolean isSameMonth(LocalDate startDate, LocalDate endDate) {
+        return YearMonth.from(startDate).equals(YearMonth.from(endDate));
+    }
+
+    private String formatTrendLabel(
+            LocalDate startDate,
+            LocalDate endDate,
+            HistoryTrendPointProjection trendPoint
+    ) {
+        if (isSameMonth(startDate, endDate)) {
+            return trendPoint.getTransactionDate().toString();
+        }
+        return YearMonth.of(trendPoint.getYear(), trendPoint.getMonth()).toString();
     }
 
     private Category getOrCreateCategory(String userId, CreateTransactionRequest request, OffsetDateTime now) {
@@ -228,17 +226,6 @@ public class TransactionService {
         return Math.min(requestedSize, MAX_HISTORY_SIZE);
     }
 
-    private String formatTrendMonth(HistoryTrendPointProjection trendPoint) {
-        return YearMonth.of(trendPoint.getYear(), trendPoint.getMonth()).toString();
-    }
-
-    /**
-     * 計算類別金額占總金額的百分比。
-     *
-     * 輸入：類別金額與總金額。
-     * 輸出：四捨五入到小數二位的百分比。
-     * 可能錯誤：無，總金額為零時回傳零。
-     */
     private BigDecimal calculatePercentage(BigDecimal amount, BigDecimal totalAmount) {
         if (BigDecimal.ZERO.compareTo(totalAmount) == 0) {
             return BigDecimal.ZERO;

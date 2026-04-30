@@ -201,63 +201,6 @@
           <button type="button" @click="showHistory">查看更多</button>
         </section>
       </section>
-
-      <section class="chart-panel history-summary-panel">
-        <div class="panel-header">
-          <h2>類別摘要</h2>
-          <span>{{ typeLabel(historyType) }}</span>
-        </div>
-        <div class="donut-chart" :class="{ empty: historyCategorySummaries.length === 0 }" aria-label="歷史類別占比">
-          <template v-if="historyCategorySummaries.length > 0">
-            <svg viewBox="0 0 120 120" role="img" aria-label="歷史查詢區間類別占比">
-              <circle class="donut-bg" cx="60" cy="60" r="42" />
-              <circle
-                v-for="segment in historyDonutSegments"
-                :key="segment.categoryName"
-                class="donut-segment"
-                cx="60"
-                cy="60"
-                r="42"
-                :stroke="segment.color"
-                :stroke-dasharray="`${segment.length} ${donutCircumference - segment.length}`"
-                :stroke-dashoffset="segment.offset"
-              >
-                <title>
-                  {{ typeLabel(historyType) }} {{ segment.categoryName }} {{ formatAmount(segment.amount) }}
-                  {{ formatPercentage(segment.percentage) }}
-                </title>
-              </circle>
-            </svg>
-            <div class="donut-center">
-              <span>{{ typeLabel(historyType) }}</span>
-              <strong>{{ formatAmount(historySummaryTotal) }}</strong>
-            </div>
-          </template>
-          <span v-else>查詢區間沒有資料</span>
-        </div>
-        <table class="summary-table">
-          <thead>
-            <tr>
-              <th>類別</th>
-              <th>金額</th>
-              <th>占比</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isLoadingHistorySummary">
-              <td colspan="3">載入中</td>
-            </tr>
-            <tr v-else-if="historyCategorySummaries.length === 0">
-              <td colspan="3">查詢區間沒有資料</td>
-            </tr>
-            <tr v-for="summary in historyCategorySummaries" v-else :key="summary.categoryName">
-              <td>{{ summary.categoryName }}</td>
-              <td>{{ formatAmount(summary.amount) }}</td>
-              <td>{{ formatPercentage(summary.percentage) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
     </section>
 
     <section v-else class="history-workspace" aria-label="歷史查看">
@@ -314,6 +257,95 @@
           <button type="button" :disabled="!historyHasNext || isLoadingHistory" @click="nextHistoryPage">下一頁</button>
         </div>
       </section>
+
+      <aside class="history-side-panel">
+        <section class="chart-panel history-summary-panel">
+          <div class="panel-header">
+            <h2>類別摘要</h2>
+            <span>{{ typeLabel(historyType) }}</span>
+          </div>
+          <div class="donut-chart" :class="{ empty: historyCategorySummaries.length === 0 }" aria-label="歷史類別占比">
+            <template v-if="historyCategorySummaries.length > 0">
+              <svg viewBox="0 0 120 120" role="img" aria-label="歷史查詢區間類別占比">
+                <circle class="donut-bg" cx="60" cy="60" r="42" />
+                <circle
+                  v-for="segment in historyDonutSegments"
+                  :key="segment.categoryName"
+                  class="donut-segment"
+                  cx="60"
+                  cy="60"
+                  r="42"
+                  :stroke="segment.color"
+                  :stroke-dasharray="`${segment.length} ${donutCircumference - segment.length}`"
+                  :stroke-dashoffset="segment.offset"
+                >
+                  <title>
+                    {{ typeLabel(historyType) }} {{ segment.categoryName }} {{ formatAmount(segment.amount) }}
+                    {{ formatPercentage(segment.percentage) }}
+                  </title>
+                </circle>
+              </svg>
+              <div class="donut-center">
+                <span>{{ typeLabel(historyType) }}</span>
+                <strong>{{ formatAmount(historySummaryTotal) }}</strong>
+              </div>
+            </template>
+            <span v-else>查詢區間沒有資料</span>
+          </div>
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>類別</th>
+                <th>金額</th>
+                <th>占比</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="isLoadingHistorySummary">
+                <td colspan="3">載入中</td>
+              </tr>
+              <tr v-else-if="historyCategorySummaries.length === 0">
+                <td colspan="3">查詢區間沒有資料</td>
+              </tr>
+              <tr v-for="summary in historyCategorySummaries" v-else :key="summary.categoryName">
+                <td>{{ summary.categoryName }}</td>
+                <td>{{ formatAmount(summary.amount) }}</td>
+                <td>{{ formatPercentage(summary.percentage) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="chart-panel history-trend-panel">
+          <div class="panel-header">
+            <h2>趨勢圖</h2>
+            <span>{{ historyTrendLabel }}</span>
+          </div>
+
+          <div v-if="isLoadingHistoryTrend" class="line-chart empty">載入中</div>
+          <div v-else-if="historyTrendPoints.length === 0" class="line-chart empty">查詢區間沒有資料</div>
+          <div v-else class="line-chart" aria-label="歷史趨勢圖">
+            <svg viewBox="0 0 320 180" role="img">
+              <polyline class="line-grid" points="52,28 52,140 292,140" />
+              <text class="line-axis-label line-axis-label-y" transform="translate(12 96) rotate(-90)">
+                Y 軸：累積金額
+              </text>
+              <text class="line-axis-label line-axis-label-x" x="172" y="174" text-anchor="middle">
+                X 軸：{{ historyTrendXAxisLabel }}
+              </text>
+              <polyline class="line-path" :points="historyLinePoints" />
+              <g v-for="point in historyLinePointDetails" :key="point.label">
+                <circle class="line-point" :cx="point.x" :cy="point.y" r="4">
+                  <title>{{ point.label }} {{ historyTrendLabel }} {{ formatCurrency(point.value) }}</title>
+                </circle>
+                <text class="line-point-value" :x="point.x" :y="point.labelY" text-anchor="middle">
+                  {{ formatCurrency(point.value) }}
+                </text>
+              </g>
+            </svg>
+          </div>
+        </section>
+      </aside>
     </section>
 
     <p v-if="message" class="message" role="status">{{ message }}</p>
@@ -367,12 +399,30 @@ interface DonutSegment {
   offset: number;
 }
 
+interface HistoryTrendPointResponse {
+  label: string;
+  amount: number;
+  cumulativeAmount: number;
+}
+
+interface LinePoint {
+  label: string;
+  value: number;
+  x: number;
+  y: number;
+  labelY: number;
+}
+
 const expenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長', '社交', '治裝費', '運動'];
 const incomeCategories = ['投資', '薪資'];
 const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
 const DONUT_RADIUS = 42;
 const donutCircumference = 2 * Math.PI * DONUT_RADIUS;
 const chartColors = ['#3273dc', '#1f9d55', '#d97706', '#8b5cf6', '#dc2626', '#0891b2', '#4b5563', '#be185d'];
+const LINE_CHART_LEFT = 52;
+const LINE_CHART_RIGHT = 292;
+const LINE_CHART_TOP = 28;
+const LINE_CHART_BOTTOM = 140;
 
 const today = new Date().toISOString().slice(0, 10);
 const defaultHistoryStartDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -383,6 +433,7 @@ const recentTransactions = ref<TransactionResponse[]>([]);
 const historyTransactions = ref<TransactionResponse[]>([]);
 const categorySummaries = ref<CategorySummaryResponse[]>([]);
 const historyCategorySummaries = ref<CategorySummaryResponse[]>([]);
+const historyTrendPoints = ref<HistoryTrendPointResponse[]>([]);
 const recentLimit = ref(5);
 const historyType = ref<TransactionType>('EXPENSE');
 const historyStartDate = ref(defaultHistoryStartDate);
@@ -396,6 +447,7 @@ const isLoadingRecent = ref(false);
 const isLoadingHistory = ref(false);
 const isLoadingSummary = ref(false);
 const isLoadingHistorySummary = ref(false);
+const isLoadingHistoryTrend = ref(false);
 const message = ref('');
 const focusedDateRowId = ref<number | null>(null);
 
@@ -406,6 +458,35 @@ const canSubmit = computed(() => rows.value.every((row) => {
 
 const summaryTotal = computed(() => categorySummaries.value.reduce((total, summary) => total + summary.amount, 0));
 const historySummaryTotal = computed(() => historyCategorySummaries.value.reduce((total, summary) => total + summary.amount, 0));
+const isSameMonthHistoryQuery = computed(() => historyStartDate.value.slice(0, 7) === historyEndDate.value.slice(0, 7));
+const historyTrendLabel = computed(() => {
+  const unit = isSameMonthHistoryQuery.value ? '每日累積' : '每月累積';
+  return `${unit}${historyType.value === 'EXPENSE' ? '支出' : '收入'}`;
+});
+const historyTrendXAxisLabel = computed(() => (isSameMonthHistoryQuery.value ? '日期' : '月份'));
+const historyTrendValues = computed(() => historyTrendPoints.value.map((point) => point.cumulativeAmount));
+const historyLinePointDetails = computed<LinePoint[]>(() => {
+  const maxValue = Math.max(...historyTrendValues.value, 1);
+  const xRange = LINE_CHART_RIGHT - LINE_CHART_LEFT;
+  const yRange = LINE_CHART_BOTTOM - LINE_CHART_TOP;
+  const lastIndex = historyTrendPoints.value.length - 1;
+
+  return historyTrendPoints.value.map((point, index) => {
+    const value = historyTrendValues.value[index] ?? 0;
+    const x = lastIndex === 0 ? (LINE_CHART_LEFT + LINE_CHART_RIGHT) / 2 : LINE_CHART_LEFT + (xRange * index / lastIndex);
+    const y = LINE_CHART_BOTTOM - (yRange * value / maxValue);
+    return {
+      label: point.label,
+      value,
+      x,
+      y,
+      labelY: Math.max(y - 10, 12)
+    };
+  });
+});
+const historyLinePoints = computed(() => historyLinePointDetails.value
+  .map((point) => `${point.x},${point.y}`)
+  .join(' '));
 
 const donutSegments = computed<DonutSegment[]>(() => {
   return buildDonutSegments(categorySummaries.value);
@@ -623,7 +704,7 @@ async function loadHistory() {
 }
 
 async function loadHistoryView() {
-  await Promise.all([loadHistory(), loadHistoryCategorySummary()]);
+  await Promise.all([loadHistory(), loadHistoryCategorySummary(), loadHistoryTrend()]);
 }
 
 async function loadCategorySummary(showError = true) {
@@ -672,6 +753,33 @@ async function loadHistoryCategorySummary() {
   }
 }
 
+async function loadHistoryTrend() {
+  if (historyStartDate.value > historyEndDate.value) {
+    historyTrendPoints.value = [];
+    return false;
+  }
+
+  isLoadingHistoryTrend.value = true;
+  try {
+    const params = new URLSearchParams({
+      type: historyType.value,
+      startDate: historyStartDate.value,
+      endDate: historyEndDate.value
+    });
+    const response = await fetch(`/api/transactions/history-trend?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, '歷史趨勢載入失敗，請稍後再試'));
+    }
+    historyTrendPoints.value = await response.json() as HistoryTrendPointResponse[];
+    return true;
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '歷史趨勢載入失敗');
+    return false;
+  } finally {
+    isLoadingHistoryTrend.value = false;
+  }
+}
+
 async function getErrorMessage(response: Response, fallbackMessage: string) {
   const text = await response.text();
   if (response.status >= 400 && response.status < 500) {
@@ -686,6 +794,10 @@ function typeLabel(type: TransactionType) {
 
 function formatAmount(amount: number) {
   return new Intl.NumberFormat('zh-TW').format(amount);
+}
+
+function formatCurrency(amount: number) {
+  return `$${formatAmount(amount)}`;
 }
 
 function formatPercentage(percentage: number) {

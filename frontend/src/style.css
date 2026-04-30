@@ -103,6 +103,16 @@ button.active {
   align-self: start;
 }
 
+.history-side-panel {
+  display: grid;
+  gap: 16px;
+  align-self: start;
+}
+
+.history-trend-panel {
+  overflow-x: auto;
+}
+
 h1,
 h2 {
   margin: 0 0 16px;
@@ -298,6 +308,58 @@ td {
 
 .donut-center strong {
   font-size: 18px;
+}
+
+.line-chart {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: #52606d;
+}
+
+.line-chart svg {
+  width: 100%;
+  max-width: 420px;
+  min-height: 220px;
+}
+
+.line-chart.empty {
+  border: 1px dashed #bcccdc;
+  border-radius: 8px;
+}
+
+.line-grid {
+  fill: none;
+  stroke: #cbd2d9;
+  stroke-width: 1.5;
+}
+
+.line-path {
+  fill: none;
+  stroke: #3273dc;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.line-point {
+  fill: #ffffff;
+  stroke: #3273dc;
+  stroke-width: 3;
+}
+
+.line-axis-label {
+  fill: #52606d;
+  color: #52606d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.line-point-value {
+  fill: #1f2933;
+  color: #1f2933;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .message {
