@@ -164,6 +164,24 @@ class TransactionControllerTests {
     }
 
     @Test
+    void listCategorySummariesSupportsDateRange() throws Exception {
+        createTransaction("EXPENSE", "2026-04-20", 500, "Food", "old");
+        createTransaction("EXPENSE", "2026-04-27", 100, "Food", "in range");
+        createTransaction("EXPENSE", "2026-04-28", 100, "Transit", "in range");
+        createTransaction("EXPENSE", "2026-04-29", 300, "Shopping", "in range");
+
+        mockMvc.perform(get("/api/transactions/category-summary")
+                        .param("type", "EXPENSE")
+                        .param("startDate", "2026-04-27")
+                        .param("endDate", "2026-04-29"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].categoryName").value("Shopping"))
+                .andExpect(jsonPath("$[0].amount").value(300))
+                .andExpect(jsonPath("$[0].percentage").value(60.0));
+    }
+
+    @Test
     void createBatchRejectsInvalidRequiredFields() throws Exception {
         String requestBody = """
                 {

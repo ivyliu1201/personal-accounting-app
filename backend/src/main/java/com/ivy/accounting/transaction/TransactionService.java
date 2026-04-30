@@ -106,10 +106,14 @@ public class TransactionService {
      * 可能錯誤：資料庫查詢失敗時拋出資料存取例外。
      */
     @Transactional(readOnly = true)
-    public List<CategorySummaryResponse> listCategorySummaries(TransactionType type) {
+    public List<CategorySummaryResponse> listCategorySummaries(
+            TransactionType type,
+            LocalDate requestedStartDate,
+            LocalDate requestedEndDate
+    ) {
         String userId = currentUserProvider.getCurrentUserId();
-        LocalDate endDate = LocalDate.now(clock);
-        LocalDate startDate = endDate.minusDays(SUMMARY_RANGE_DAYS - 1L);
+        LocalDate endDate = requestedEndDate == null ? LocalDate.now(clock) : requestedEndDate;
+        LocalDate startDate = requestedStartDate == null ? endDate.minusDays(SUMMARY_RANGE_DAYS - 1L) : requestedStartDate;
         List<CategorySummaryProjection> summaries = transactionRepository.listCategorySummaries(
                 userId,
                 type,

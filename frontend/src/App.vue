@@ -201,6 +201,63 @@
           <button type="button" @click="showHistory">查看更多</button>
         </section>
       </section>
+
+      <section class="chart-panel history-summary-panel">
+        <div class="panel-header">
+          <h2>類別摘要</h2>
+          <span>{{ typeLabel(historyType) }}</span>
+        </div>
+        <div class="donut-chart" :class="{ empty: historyCategorySummaries.length === 0 }" aria-label="歷史類別占比">
+          <template v-if="historyCategorySummaries.length > 0">
+            <svg viewBox="0 0 120 120" role="img" aria-label="歷史查詢區間類別占比">
+              <circle class="donut-bg" cx="60" cy="60" r="42" />
+              <circle
+                v-for="segment in historyDonutSegments"
+                :key="segment.categoryName"
+                class="donut-segment"
+                cx="60"
+                cy="60"
+                r="42"
+                :stroke="segment.color"
+                :stroke-dasharray="`${segment.length} ${donutCircumference - segment.length}`"
+                :stroke-dashoffset="segment.offset"
+              >
+                <title>
+                  {{ typeLabel(historyType) }} {{ segment.categoryName }} {{ formatAmount(segment.amount) }}
+                  {{ formatPercentage(segment.percentage) }}
+                </title>
+              </circle>
+            </svg>
+            <div class="donut-center">
+              <span>{{ typeLabel(historyType) }}</span>
+              <strong>{{ formatAmount(historySummaryTotal) }}</strong>
+            </div>
+          </template>
+          <span v-else>查詢區間沒有資料</span>
+        </div>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>類別</th>
+              <th>金額</th>
+              <th>占比</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="isLoadingHistorySummary">
+              <td colspan="3">載入中</td>
+            </tr>
+            <tr v-else-if="historyCategorySummaries.length === 0">
+              <td colspan="3">查詢區間沒有資料</td>
+            </tr>
+            <tr v-for="summary in historyCategorySummaries" v-else :key="summary.categoryName">
+              <td>{{ summary.categoryName }}</td>
+              <td>{{ formatAmount(summary.amount) }}</td>
+              <td>{{ formatPercentage(summary.percentage) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </section>
 
     <section v-else class="history-workspace" aria-label="歷史查看">
@@ -325,6 +382,7 @@ const currentView = ref<'home' | 'history'>('home');
 const recentTransactions = ref<TransactionResponse[]>([]);
 const historyTransactions = ref<TransactionResponse[]>([]);
 const categorySummaries = ref<CategorySummaryResponse[]>([]);
+const historyCategorySummaries = ref<CategorySummaryResponse[]>([]);
 const recentLimit = ref(5);
 const historyType = ref<TransactionType>('EXPENSE');
 const historyStartDate = ref(defaultHistoryStartDate);
@@ -337,6 +395,7 @@ const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
 const isLoadingHistory = ref(false);
 const isLoadingSummary = ref(false);
+const isLoadingHistorySummary = ref(false);
 const message = ref('');
 const focusedDateRowId = ref<number | null>(null);
 
@@ -346,10 +405,19 @@ const canSubmit = computed(() => rows.value.every((row) => {
 }));
 
 const summaryTotal = computed(() => categorySummaries.value.reduce((total, summary) => total + summary.amount, 0));
+const historySummaryTotal = computed(() => historyCategorySummaries.value.reduce((total, summary) => total + summary.amount, 0));
 
 const donutSegments = computed<DonutSegment[]>(() => {
+  return buildDonutSegments(categorySummaries.value);
+});
+
+const historyDonutSegments = computed<DonutSegment[]>(() => {
+  return buildDonutSegments(historyCategorySummaries.value);
+});
+
+function buildDonutSegments(summaries: CategorySummaryResponse[]) {
   let usedLength = 0;
-  return categorySummaries.value.map((summary, index) => {
+  return summaries.map((summary, index) => {
     const length = donutCircumference * (summary.percentage / 100);
     const segment = {
       categoryName: summary.categoryName,
@@ -362,7 +430,7 @@ const donutSegments = computed<DonutSegment[]>(() => {
     usedLength += length;
     return segment;
   });
-});
+}
 
 onMounted(() => {
   void loadRecent();
@@ -480,7 +548,7 @@ function showHome() {
 
 function showHistory() {
   currentView.value = 'history';
-  void loadHistory();
+  void loadHistoryView();
 }
 
 async function loadRecent(showError = true) {
@@ -504,7 +572,7 @@ async function loadRecent(showError = true) {
 
 async function resetHistoryPageAndLoad() {
   historyPage.value = 0;
-  await loadHistory();
+  await loadHistoryView();
 }
 
 async function previousHistoryPage() {
@@ -554,6 +622,10 @@ async function loadHistory() {
   }
 }
 
+async function loadHistoryView() {
+  await Promise.all([loadHistory(), loadHistoryCategorySummary()]);
+}
+
 async function loadCategorySummary(showError = true) {
   isLoadingSummary.value = true;
   try {
@@ -570,6 +642,33 @@ async function loadCategorySummary(showError = true) {
     return false;
   } finally {
     isLoadingSummary.value = false;
+  }
+}
+
+async function loadHistoryCategorySummary() {
+  if (historyStartDate.value > historyEndDate.value) {
+    historyCategorySummaries.value = [];
+    return false;
+  }
+
+  isLoadingHistorySummary.value = true;
+  try {
+    const params = new URLSearchParams({
+      type: historyType.value,
+      startDate: historyStartDate.value,
+      endDate: historyEndDate.value
+    });
+    const response = await fetch(`/api/transactions/category-summary?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, '歷史類別摘要載入失敗，請稍後再試'));
+    }
+    historyCategorySummaries.value = await response.json() as CategorySummaryResponse[];
+    return true;
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '歷史類別摘要載入失敗');
+    return false;
+  } finally {
+    isLoadingHistorySummary.value = false;
   }
 }
 

@@ -65,8 +65,10 @@ public class TransactionController {
      */
     @GetMapping("/category-summary")
     public List<CategorySummaryResponse> listCategorySummaries(
-            @RequestParam(defaultValue = "EXPENSE") TransactionType type
+            @RequestParam(defaultValue = "EXPENSE") TransactionType type,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate
     ) {
-        return transactionService.listCategorySummaries(type);
+        return transactionService.listCategorySummaries(type, startDate, endDate);
     }
 }
