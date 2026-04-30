@@ -425,7 +425,7 @@ async function submitBatch() {
     });
 
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response));
+      throw new Error(await getErrorMessage(response, '新增失敗，請確認欄位內容後再試一次'));
     }
 
     rows.value = [createRow()];
@@ -457,7 +457,7 @@ async function loadRecent() {
   try {
     const response = await fetch(`/api/transactions/recent?limit=${recentLimit.value}`);
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response));
+      throw new Error(await getErrorMessage(response, '最近明細載入失敗，請稍後再試'));
     }
     recentTransactions.value = await response.json() as TransactionResponse[];
   } catch (error) {
@@ -505,7 +505,7 @@ async function loadHistory() {
     });
     const response = await fetch(`/api/transactions/history?${params.toString()}`);
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response));
+      throw new Error(await getErrorMessage(response, '歷史明細載入失敗，請稍後再試'));
     }
     const data = await response.json() as HistoryTransactionsResponse;
     historyTransactions.value = data.transactions;
@@ -524,7 +524,7 @@ async function loadCategorySummary() {
   try {
     const response = await fetch(`/api/transactions/category-summary?type=${summaryType.value}`);
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response));
+      throw new Error(await getErrorMessage(response, '類別摘要載入失敗，請稍後再試'));
     }
     categorySummaries.value = await response.json() as CategorySummaryResponse[];
   } catch (error) {
@@ -534,9 +534,12 @@ async function loadCategorySummary() {
   }
 }
 
-async function getErrorMessage(response: Response) {
+async function getErrorMessage(response: Response, fallbackMessage: string) {
   const text = await response.text();
-  return text || `HTTP ${response.status}`;
+  if (response.status >= 400 && response.status < 500) {
+    return fallbackMessage;
+  }
+  return text || fallbackMessage;
 }
 
 function typeLabel(type: TransactionType) {
