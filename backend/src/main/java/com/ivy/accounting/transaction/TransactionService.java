@@ -11,6 +11,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -133,6 +134,34 @@ public class TransactionService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<HistoryTrendPointResponse> listHistoryTrend(
+            TransactionType type,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        String userId = currentUserProvider.getCurrentUserId();
+        List<HistoryTrendPointProjection> trendPoints = transactionRepository.listHistoryTrend(
+                userId,
+                type,
+                startDate,
+                endDate
+        );
+        BigDecimal cumulativeAmount = BigDecimal.ZERO;
+        List<HistoryTrendPointResponse> responses = new ArrayList<>();
+
+        for (HistoryTrendPointProjection trendPoint : trendPoints) {
+            cumulativeAmount = cumulativeAmount.add(trendPoint.getAmount());
+            responses.add(new HistoryTrendPointResponse(
+                    formatTrendMonth(trendPoint),
+                    trendPoint.getAmount(),
+                    cumulativeAmount
+            ));
+        }
+
+        return responses;
+    }
+
     private Category getOrCreateCategory(String userId, CreateTransactionRequest request, OffsetDateTime now) {
         String categoryName = request.categoryName().trim();
         return categoryRepository.getVisibleCategory(userId, request.type(), categoryName)
@@ -197,6 +226,10 @@ public class TransactionService {
             return DEFAULT_HISTORY_SIZE;
         }
         return Math.min(requestedSize, MAX_HISTORY_SIZE);
+    }
+
+    private String formatTrendMonth(HistoryTrendPointProjection trendPoint) {
+        return YearMonth.of(trendPoint.getYear(), trendPoint.getMonth()).toString();
     }
 
     /**

@@ -40,4 +40,22 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    @Query("""
+            select year(t.transactionDate) as year,
+                   month(t.transactionDate) as month,
+                   sum(t.amount) as amount
+            from AccountingTransaction t
+            where t.userId = :userId
+              and t.type = :type
+              and t.transactionDate between :startDate and :endDate
+            group by year(t.transactionDate), month(t.transactionDate)
+            order by year(t.transactionDate) asc, month(t.transactionDate) asc
+            """)
+    List<HistoryTrendPointProjection> listHistoryTrend(
+            @Param("userId") String userId,
+            @Param("type") TransactionType type,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 }

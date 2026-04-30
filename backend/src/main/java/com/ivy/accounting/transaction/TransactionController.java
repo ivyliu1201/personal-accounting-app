@@ -71,4 +71,13 @@ public class TransactionController {
     ) {
         return transactionService.listCategorySummaries(type, startDate, endDate);
     }
+
+    @GetMapping("/history-trend")
+    public List<HistoryTrendPointResponse> listHistoryTrend(
+            @RequestParam(defaultValue = "EXPENSE") TransactionType type,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        return transactionService.listHistoryTrend(type, startDate, endDate);
+    }
 }
