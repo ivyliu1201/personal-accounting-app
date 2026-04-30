@@ -25,7 +25,6 @@
                 v-model="row.transactionDate"
                 type="date"
                 :max="today"
-                :class="{ empty: !row.transactionDate }"
                 aria-label="日期"
               />
               <span v-if="!row.transactionDate" class="date-placeholder">未選擇</span>
@@ -160,7 +159,7 @@
         <section class="details-panel">
           <div class="panel-header">
             <h2>最近明細</h2>
-            <select v-model.number="recentLimit" aria-label="每頁筆數" @change="loadRecent">
+            <select v-model.number="recentLimit" aria-label="每頁筆數" @change="loadRecent()">
               <option :value="5">5 筆</option>
               <option :value="10">10 筆</option>
               <option :value="15">15 筆</option>
@@ -415,6 +414,10 @@ function normalizeAmount(row: EntryRow) {
 }
 
 async function submitBatch() {
+  if (isSubmitting.value) {
+    return;
+  }
+
   if (!canSubmit.value) {
     showMessage('請完成所有必填欄位');
     return;
@@ -443,8 +446,11 @@ async function submitBatch() {
     }
 
     rows.value = [createRow()];
-    showMessage('新增成功');
-    await Promise.all([loadRecent(), loadCategorySummary()]);
+    const [recentLoaded, summaryLoaded] = await Promise.all([
+      loadRecent(false),
+      loadCategorySummary(false)
+    ]);
+    showMessage(recentLoaded && summaryLoaded ? '新增成功，明細已更新' : '新增成功，但資料重新整理失敗，請重新整理頁面');
   } catch (error) {
     showMessage(error instanceof Error ? error.message : '新增失敗');
   } finally {
@@ -466,7 +472,7 @@ function showHistory() {
   void loadHistory();
 }
 
-async function loadRecent() {
+async function loadRecent(showError = true) {
   isLoadingRecent.value = true;
   try {
     const response = await fetch(`/api/transactions/recent?limit=${recentLimit.value}`);
@@ -474,8 +480,12 @@ async function loadRecent() {
       throw new Error(await getErrorMessage(response, '最近明細載入失敗，請稍後再試'));
     }
     recentTransactions.value = await response.json() as TransactionResponse[];
+    return true;
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : '最近明細載入失敗');
+    if (showError) {
+      showMessage(error instanceof Error ? error.message : '最近明細載入失敗');
+    }
+    return false;
   } finally {
     isLoadingRecent.value = false;
   }
@@ -533,7 +543,7 @@ async function loadHistory() {
   }
 }
 
-async function loadCategorySummary() {
+async function loadCategorySummary(showError = true) {
   isLoadingSummary.value = true;
   try {
     const response = await fetch(`/api/transactions/category-summary?type=${summaryType.value}`);
@@ -541,8 +551,12 @@ async function loadCategorySummary() {
       throw new Error(await getErrorMessage(response, '類別摘要載入失敗，請稍後再試'));
     }
     categorySummaries.value = await response.json() as CategorySummaryResponse[];
+    return true;
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : '類別摘要載入失敗');
+    if (showError) {
+      showMessage(error instanceof Error ? error.message : '類別摘要載入失敗');
+    }
+    return false;
   } finally {
     isLoadingSummary.value = false;
   }

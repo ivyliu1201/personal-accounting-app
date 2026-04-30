@@ -145,25 +145,15 @@ h2 {
 }
 
 .date-field {
-  position: relative;
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
 
 .date-placeholder {
-  position: absolute;
-  left: 9px;
-  top: 50%;
   color: #52606d;
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.date-field input.empty {
-  color: transparent;
-}
-
-.date-field input.empty:focus {
-  color: inherit;
+  font-size: 12px;
+  line-height: 1;
 }
 
 .icon-button {
