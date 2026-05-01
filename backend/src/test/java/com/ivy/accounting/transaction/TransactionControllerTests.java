@@ -172,6 +172,44 @@ class TransactionControllerTests {
     }
 
     @Test
+    void updateTransactionRejectsFutureDate() throws Exception {
+        String transactionId = createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "before");
+        String requestBody = """
+                {
+                  "type": "EXPENSE",
+                  "transactionDate": "2999-01-01",
+                  "amount": 80,
+                  "categoryName": "飲食",
+                  "note": "future date"
+                }
+                """;
+
+        mockMvc.perform(put("/api/transactions/{id}", transactionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateTransactionRejectsZeroAmount() throws Exception {
+        String transactionId = createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "before");
+        String requestBody = """
+                {
+                  "type": "EXPENSE",
+                  "transactionDate": "2026-04-27",
+                  "amount": 0,
+                  "categoryName": "飲食",
+                  "note": "zero amount"
+                }
+                """;
+
+        mockMvc.perform(put("/api/transactions/{id}", transactionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deleteTransactionRemovesOnlyRequestedUserTransaction() throws Exception {
         String transactionId = createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "delete me");
 
@@ -362,6 +400,54 @@ class TransactionControllerTests {
                       "amount": 0,
                       "categoryName": "",
                       "note": "invalid"
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/transactions/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+
+        assertThat(transactionRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void createBatchRejectsFutureDate() throws Exception {
+        String requestBody = """
+                {
+                  "transactions": [
+                    {
+                      "type": "EXPENSE",
+                      "transactionDate": "2999-01-01",
+                      "amount": 100,
+                      "categoryName": "飲食",
+                      "note": "future date"
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/transactions/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+
+        assertThat(transactionRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void createBatchRejectsZeroAmount() throws Exception {
+        String requestBody = """
+                {
+                  "transactions": [
+                    {
+                      "type": "EXPENSE",
+                      "transactionDate": "2026-04-29",
+                      "amount": 0,
+                      "categoryName": "飲食",
+                      "note": "zero amount"
                     }
                   ]
                 }
