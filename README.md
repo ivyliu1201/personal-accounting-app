@@ -110,8 +110,15 @@ APP_AUTH_DEV_FALLBACK_ENABLED=true
 APP_FIREBASE_ENABLED=false
 APP_ALLOWED_USER_EMAILS=fannyliu1201@gmail.com,ccindy0602@gmail.com
 FIREBASE_SERVICE_ACCOUNT_PATH=C:\path\to\personal-accounting-firebase-admin.json
+VITE_FIREBASE_API_KEY=your-web-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+VITE_FIREBASE_APP_ID=your-web-app-id
 ```
 
 Firebase Authentication 預設關閉，後端會使用 `APP_DEV_USER_ID` 作為本機開發使用者。
 啟用 Firebase 時，將 `APP_FIREBASE_ENABLED` 設為 `true`，並設定 `FIREBASE_SERVICE_ACCOUNT_PATH` 指向本機 service account JSON。
 `APP_ALLOWED_USER_EMAILS` 使用逗號分隔，之後新增可登入的 Gmail 只需要追加到此變數。
+前端 Firebase Web 設定使用 `VITE_FIREBASE_*` 變數，這些值會在前端 build 時注入。

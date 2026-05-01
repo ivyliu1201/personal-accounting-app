@@ -73,7 +73,11 @@ button.active {
   border: 1px solid #cbd2d9;
   border-radius: 999px;
   color: #52606d;
+  max-width: 220px;
+  overflow: hidden;
   padding: 7px 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace {

@@ -5,7 +5,9 @@
       <div class="nav-links">
         <button type="button" :class="{ active: currentView === 'home' }" @click="showHome">首頁</button>
         <button type="button" :class="{ active: currentView === 'history' }" @click="showHistory">歷史查看</button>
-        <span class="user-pill">dev-user</span>
+        <span v-if="currentUser" class="user-pill">{{ currentUserDisplayName }}</span>
+        <button v-if="currentUser" type="button" @click="signOutUser">登出</button>
+        <button v-else type="button" @click="signInWithGoogle">Google 登入</button>
       </div>
     </nav>
 
@@ -357,6 +359,15 @@
 </template>
 
 <script setup lang="ts">
+import { initializeApp } from 'firebase/app';
+import {
+  GoogleAuthProvider,
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  type User
+} from 'firebase/auth';
 import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue';
 import { formatDateTime } from './dateFormat';
 
@@ -459,6 +470,18 @@ const TREND_CHART_TOP = 26;
 const TREND_CHART_BOTTOM = 170;
 const TREND_TICK_STEP = 4000;
 const trendAxisPoints = `${TREND_CHART_LEFT},${TREND_CHART_TOP} ${TREND_CHART_LEFT},${TREND_CHART_BOTTOM} ${TREND_CHART_RIGHT},${TREND_CHART_BOTTOM}`;
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+};
+const firebaseConfigured = Object.values(firebaseConfig).every((value) => Boolean(value));
+const firebaseApp = firebaseConfigured ? initializeApp(firebaseConfig) : null;
+const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
+const googleProvider = new GoogleAuthProvider();
 
 const todayDate = new Date();
 const today = formatDateInputValue(todayDate);
@@ -500,6 +523,7 @@ const deletingTransaction = ref<TransactionResponse | null>(null);
 const editForm = ref<EditForm>(createEditForm());
 const isSavingEdit = ref(false);
 const isDeleting = ref(false);
+const currentUser = ref<User | null>(null);
 
 const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
@@ -521,6 +545,7 @@ const historyTrendYear = computed(() => Number(historyStartDate.value.slice(0, 4
 const summaryPeriodLabel = computed(() => formatRangeLabel(defaultMonthStartDate, today));
 const historyPeriodLabel = computed(() => formatRangeLabel(historyStartDate.value, historyEndDate.value));
 const historyTrendLabel = computed(() => `${historyTrendYear.value} 年每月總現金流與累積總現金流`);
+const currentUserDisplayName = computed(() => currentUser.value?.displayName || currentUser.value?.email || '已登入');
 
 const activeSummaryRows = computed(() => getSummaryRows(
   summaryMode.value,
@@ -696,6 +721,11 @@ const DonutBlock = defineComponent({
 });
 
 onMounted(() => {
+  if (firebaseAuth) {
+    onAuthStateChanged(firebaseAuth, (user) => {
+      currentUser.value = user;
+    });
+  }
   void loadCategories();
   void loadRecent();
   void loadCategorySummary();
@@ -807,7 +837,7 @@ async function submitBatch() {
 
   isSubmitting.value = true;
   try {
-    const response = await fetch('/api/transactions/batch', {
+    const response = await apiFetch('/api/transactions/batch', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -883,7 +913,7 @@ async function submitEdit() {
 
   isSavingEdit.value = true;
   try {
-    const response = await fetch(`/api/transactions/${editingTransaction.value.id}`, {
+    const response = await apiFetch(`/api/transactions/${editingTransaction.value.id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -934,7 +964,7 @@ async function confirmDelete() {
 
   isDeleting.value = true;
   try {
-    const response = await fetch(`/api/transactions/${deletingTransaction.value.id}`, {
+    const response = await apiFetch(`/api/transactions/${deletingTransaction.value.id}`, {
       method: 'DELETE'
     });
 
@@ -1008,8 +1038,8 @@ function showHistory() {
 async function loadCategories(showError = true) {
   try {
     const [expenseResponse, incomeResponse] = await Promise.all([
-      fetch('/api/transactions/categories?type=EXPENSE'),
-      fetch('/api/transactions/categories?type=INCOME')
+      apiFetch('/api/transactions/categories?type=EXPENSE'),
+      apiFetch('/api/transactions/categories?type=INCOME')
     ]);
     if (!expenseResponse.ok || !incomeResponse.ok) {
       throw new Error('類別載入失敗');
@@ -1035,7 +1065,7 @@ async function loadCategories(showError = true) {
 async function loadRecent(showError = true) {
   isLoadingRecent.value = true;
   try {
-    const response = await fetch(`/api/transactions/recent?limit=${recentLimit.value}`);
+    const response = await apiFetch(`/api/transactions/recent?limit=${recentLimit.value}`);
     if (!response.ok) {
       throw new Error(await getErrorMessage(response, '最近紀錄載入失敗'));
     }
@@ -1094,7 +1124,7 @@ async function loadHistory() {
       page: String(historyPage.value),
       size: String(historySize.value)
     });
-    const response = await fetch(`/api/transactions/history?${params.toString()}`);
+    const response = await apiFetch(`/api/transactions/history?${params.toString()}`);
     if (!response.ok) {
       throw new Error(await getErrorMessage(response, '歷史紀錄載入失敗'));
     }
@@ -1162,7 +1192,7 @@ async function loadHistoryTrend() {
     const params = new URLSearchParams({
       year: String(historyTrendYear.value)
     });
-    const response = await fetch(`/api/transactions/cash-flow-trend?${params.toString()}`);
+    const response = await apiFetch(`/api/transactions/cash-flow-trend?${params.toString()}`);
     if (!response.ok) {
       throw new Error(await getErrorMessage(response, '現金流折線圖載入失敗'));
     }
@@ -1182,11 +1212,48 @@ async function fetchCategorySummary(type: TransactionType, startDate?: string, e
     params.set('startDate', startDate);
     params.set('endDate', endDate);
   }
-  const response = await fetch(`/api/transactions/category-summary?${params.toString()}`);
+  const response = await apiFetch(`/api/transactions/category-summary?${params.toString()}`);
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, '類別占比載入失敗'));
   }
   return await response.json() as CategorySummaryResponse[];
+}
+
+async function signInWithGoogle() {
+  if (!firebaseAuth) {
+    showMessage('Firebase 尚未設定');
+    return;
+  }
+
+  try {
+    await signInWithPopup(firebaseAuth, googleProvider);
+    showMessage('登入完成');
+    await refreshAfterMutation();
+  } catch (error) {
+    showMessage(error instanceof Error ? '登入失敗，請稍後再試' : '登入失敗');
+  }
+}
+
+async function signOutUser() {
+  if (!firebaseAuth) {
+    return;
+  }
+
+  await signOut(firebaseAuth);
+  currentUser.value = null;
+  showMessage('已登出');
+}
+
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  if (firebaseAuth?.currentUser) {
+    const token = await firebaseAuth.currentUser.getIdToken();
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return fetch(input, {
+    ...init,
+    headers
+  });
 }
 
 async function getErrorMessage(response: Response, fallbackMessage: string) {
