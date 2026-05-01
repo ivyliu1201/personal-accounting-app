@@ -27,3 +27,7 @@ server:
 app:
   auth:
     dev-user-id: ${APP_DEV_USER_ID:dev-user}
+    dev-fallback-enabled: ${APP_AUTH_DEV_FALLBACK_ENABLED:true}
+    firebase-enabled: ${APP_FIREBASE_ENABLED:false}
+    firebase-service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+    allowed-emails: ${APP_ALLOWED_USER_EMAILS:}

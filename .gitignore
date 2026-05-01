@@ -15,6 +15,10 @@ frontend/*.tsbuildinfo
 # Logs
 *.log
 
+# Secrets
+*firebase-admin*.json
+secrets/
+
 # IDE
 .idea/
 .vscode/

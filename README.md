@@ -106,4 +106,12 @@ POSTGRES_DB=personal_accounting
 POSTGRES_USER=personal_accounting
 POSTGRES_PASSWORD=change_me
 APP_DEV_USER_ID=dev-user
+APP_AUTH_DEV_FALLBACK_ENABLED=true
+APP_FIREBASE_ENABLED=false
+APP_ALLOWED_USER_EMAILS=fannyliu1201@gmail.com,ccindy0602@gmail.com
+FIREBASE_SERVICE_ACCOUNT_PATH=C:\path\to\personal-accounting-firebase-admin.json
 ```
+
+Firebase Authentication 預設關閉，後端會使用 `APP_DEV_USER_ID` 作為本機開發使用者。
+啟用 Firebase 時，將 `APP_FIREBASE_ENABLED` 設為 `true`，並設定 `FIREBASE_SERVICE_ACCOUNT_PATH` 指向本機 service account JSON。
+`APP_ALLOWED_USER_EMAILS` 使用逗號分隔，之後新增可登入的 Gmail 只需要追加到此變數。

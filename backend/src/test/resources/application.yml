@@ -16,3 +16,7 @@ spring:
 app:
   auth:
     dev-user-id: dev-user
+    dev-fallback-enabled: true
+    firebase-enabled: false
+    firebase-service-account-path:
+    allowed-emails:
