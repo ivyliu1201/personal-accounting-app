@@ -80,13 +80,17 @@ button.active {
   display: grid;
   grid-template-columns: minmax(720px, 1.2fr) minmax(520px, 0.8fr);
   gap: 16px;
+  max-width: 1440px;
+  margin: 0 auto;
   padding: 16px;
 }
 
 .history-workspace {
   display: grid;
-  grid-template-columns: minmax(680px, 1.1fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(660px, 1fr) minmax(420px, 0.82fr);
   gap: 16px;
+  width: min(1360px, 100%);
+  margin: 0 auto;
   padding: 16px;
 }
 
@@ -420,21 +424,35 @@ td {
   margin-bottom: 0;
 }
 
+.donut-block {
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  color: #627d98;
+}
+
+.donut-block.empty {
+  min-height: 180px;
+  border: 1px dashed #bcccdc;
+  border-radius: 8px;
+}
+
+.donut-content {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(120px, 1fr);
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+}
+
 .donut-chart {
   position: relative;
   display: grid;
   width: min(220px, 100%);
   aspect-ratio: 1;
   place-items: center;
-  margin: 0 auto 12px;
-  color: #627d98;
-}
-
-.donut-chart.empty {
-  min-height: 180px;
-  aspect-ratio: auto;
-  border: 1px dashed #bcccdc;
-  border-radius: 8px;
+  justify-self: end;
 }
 
 .donut-chart svg {
@@ -475,6 +493,39 @@ td {
   font-size: 18px;
 }
 
+.donut-legend {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #52606d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.donut-legend li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.donut-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.donut-legend span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .trend-chart {
   display: grid;
   min-height: 220px;
@@ -498,6 +549,7 @@ td {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  justify-self: center;
   gap: 10px;
   width: 100%;
   max-width: 460px;
@@ -521,6 +573,10 @@ td {
   width: 12px;
   height: 9px;
   background: #1f9d55;
+}
+
+.legend-bar.negative {
+  background: #dc2626;
 }
 
 .legend-line {
@@ -712,6 +768,19 @@ td {
 
   .history-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .donut-content {
+    grid-template-columns: 1fr;
+  }
+
+  .donut-chart {
+    justify-self: center;
+  }
+
+  .donut-legend {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    width: 100%;
   }
 
   .history-header {

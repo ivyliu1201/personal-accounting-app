@@ -217,6 +217,7 @@
           <div v-else class="trend-chart" aria-label="年度每月總現金流與累積現金流">
             <div class="trend-legend" aria-hidden="true">
               <span><i class="legend-bar"></i>每月總現金流</span>
+              <span><i class="legend-bar negative"></i>每月負現金流</span>
               <span><i class="legend-line"></i>累積總現金流</span>
             </div>
             <svg viewBox="0 0 380 240" role="img">
@@ -656,33 +657,41 @@ const DonutBlock = defineComponent({
   },
   setup(props) {
     return () => h('div', {
-      class: ['donut-chart', { empty: props.loading || props.segments.length === 0 }],
+      class: ['donut-block', { empty: props.loading || props.segments.length === 0 }],
       'aria-label': '圓餅圖'
     }, props.loading
       ? '載入中'
       : props.segments.length === 0
         ? props.emptyLabel
-        : [
-          h('svg', { viewBox: '0 0 120 120', role: 'img' }, [
-            h('circle', { class: 'donut-bg', cx: 60, cy: 60, r: DONUT_RADIUS }),
-            props.segments.map((segment) => h('circle', {
-              key: segment.categoryName,
-              class: 'donut-segment',
-              cx: 60,
-              cy: 60,
-              r: DONUT_RADIUS,
-              stroke: segment.color,
-              'stroke-dasharray': `${segment.length} ${donutCircumference - segment.length}`,
-              'stroke-dashoffset': segment.offset
-            }, [
-              h('title', `${segment.categoryName} ${formatSignedCurrency(segment.amount)} ${formatPercentage(segment.percentage)}`)
-            ]))
+        : h('div', { class: 'donut-content' }, [
+          h('div', { class: 'donut-chart' }, [
+            h('svg', { viewBox: '0 0 120 120', role: 'img' }, [
+              h('circle', { class: 'donut-bg', cx: 60, cy: 60, r: DONUT_RADIUS }),
+              props.segments.map((segment) => h('circle', {
+                key: segment.categoryName,
+                class: 'donut-segment',
+                cx: 60,
+                cy: 60,
+                r: DONUT_RADIUS,
+                stroke: segment.color,
+                'stroke-dasharray': `${segment.length} ${donutCircumference - segment.length}`,
+                'stroke-dashoffset': segment.offset
+              }, [
+                h('title', `${segment.categoryName} ${formatSignedCurrency(segment.amount)} ${formatPercentage(segment.percentage)}`)
+              ]))
+            ]),
+            h('div', { class: 'donut-center' }, [
+              h('span', props.totalLabel),
+              h('strong', formatSignedCurrency(props.totalAmount))
+            ])
           ]),
-          h('div', { class: 'donut-center' }, [
-            h('span', props.totalLabel),
-            h('strong', formatSignedCurrency(props.totalAmount))
-          ])
-        ]);
+          h('ul', { class: 'donut-legend', 'aria-label': '圓餅圖圖例' }, props.segments.map((segment) => h('li', {
+            key: segment.categoryName
+          }, [
+            h('i', { style: { backgroundColor: segment.color } }),
+            h('span', segment.categoryName)
+          ])))
+        ]));
   }
 });
 
