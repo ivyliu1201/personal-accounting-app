@@ -357,6 +357,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue';
+import { formatDateTime } from './dateFormat';
 
 type TransactionType = 'INCOME' | 'EXPENSE';
 // TODO: SPEC currently defines income/expense charts; cash-flow mode is implemented for this requested change.
@@ -965,6 +966,8 @@ async function refreshAfterMutation() {
       loadHistory(),
       loadHistoryCategorySummary(),
       loadHistoryTrend(),
+      loadRecent(false),
+      loadCategorySummary(false),
       loadCategories(false)
     ]);
     return;
@@ -1399,13 +1402,6 @@ function formatPercentage(percentage: number) {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0
   }).format(percentage)}%`;
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('zh-TW', {
-    dateStyle: 'short',
-    timeStyle: 'short'
-  }).format(new Date(value));
 }
 
 function truncateNote(note: string | null) {

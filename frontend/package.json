@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "test:date-format": "tsc --target ES2022 --module ES2022 --moduleResolution Bundler --outDir .tmp-test --noEmit false src/dateFormat.ts && node --test tests/dateFormat.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

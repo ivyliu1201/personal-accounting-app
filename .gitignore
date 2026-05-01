@@ -9,6 +9,7 @@ backend/.mvn/*.tar.gz
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/.tmp-test/
 frontend/*.tsbuildinfo
 
 # Logs
