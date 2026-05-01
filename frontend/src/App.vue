@@ -360,7 +360,6 @@ import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue
 import { formatDateTime } from './dateFormat';
 
 type TransactionType = 'INCOME' | 'EXPENSE';
-// TODO: SPEC currently defines income/expense charts; cash-flow mode is implemented for this requested change.
 type SummaryMode = TransactionType | 'CASH_FLOW';
 
 interface EntryRow {
