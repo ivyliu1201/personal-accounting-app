@@ -102,9 +102,9 @@
             :total-label="summaryCenterLabel"
             :total-amount="summaryCenterAmount"
             :loading="isLoadingSummary"
-            empty-label="近 30 天沒有資料"
+            empty-label="本月沒有資料"
           />
-          <SummaryTable :summaries="activeSummaryRows" :loading="isLoadingSummary" empty-label="近 30 天沒有資料" />
+          <SummaryTable :summaries="activeSummaryRows" :loading="isLoadingSummary" empty-label="本月沒有資料" />
         </section>
 
         <section class="details-panel">
@@ -459,8 +459,9 @@ const TREND_CHART_BOTTOM = 170;
 const TREND_TICK_STEP = 4000;
 const trendAxisPoints = `${TREND_CHART_LEFT},${TREND_CHART_TOP} ${TREND_CHART_LEFT},${TREND_CHART_BOTTOM} ${TREND_CHART_RIGHT},${TREND_CHART_BOTTOM}`;
 
-const today = new Date().toISOString().slice(0, 10);
-const defaultHistoryStartDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const todayDate = new Date();
+const today = formatDateInputValue(todayDate);
+const defaultMonthStartDate = formatDateInputValue(new Date(todayDate.getFullYear(), todayDate.getMonth(), 1));
 let rowId = 1;
 
 const rows = ref<EntryRow[]>([createRow()]);
@@ -478,7 +479,7 @@ const categoryOptions = ref<Record<TransactionType, string[]>>({
 });
 const recentLimit = ref(5);
 const historyType = ref<TransactionType>('EXPENSE');
-const historyStartDate = ref(defaultHistoryStartDate);
+const historyStartDate = ref(defaultMonthStartDate);
 const historyEndDate = ref(today);
 const historyPage = ref(0);
 const historySize = ref(10);
@@ -516,7 +517,7 @@ const summaryExpenseTotal = computed(() => sumSummaries(expenseCategorySummaries
 const historyIncomeTotal = computed(() => sumSummaries(historyIncomeCategorySummaries.value));
 const historyExpenseTotal = computed(() => sumSummaries(historyExpenseCategorySummaries.value));
 const historyTrendYear = computed(() => Number(historyStartDate.value.slice(0, 4)));
-const summaryPeriodLabel = computed(() => formatRangeLabel(defaultHistoryStartDate, today));
+const summaryPeriodLabel = computed(() => formatRangeLabel(defaultMonthStartDate, today));
 const historyPeriodLabel = computed(() => formatRangeLabel(historyStartDate.value, historyEndDate.value));
 const historyTrendLabel = computed(() => `${historyTrendYear.value} 年每月總現金流與累積總現金流`);
 
@@ -1104,8 +1105,8 @@ async function loadCategorySummary(showError = true) {
   isLoadingSummary.value = true;
   try {
     const [expenseSummaries, incomeSummaries] = await Promise.all([
-      fetchCategorySummary('EXPENSE'),
-      fetchCategorySummary('INCOME')
+      fetchCategorySummary('EXPENSE', defaultMonthStartDate, today),
+      fetchCategorySummary('INCOME', defaultMonthStartDate, today)
     ]);
     expenseCategorySummaries.value = expenseSummaries;
     incomeCategorySummaries.value = incomeSummaries;
@@ -1371,6 +1372,13 @@ function formatRangeLabel(startDate: string, endDate: string) {
     return `${startMonth}-${endMonth}月`;
   }
   return `${start.getFullYear()}/${startMonth}-${end.getFullYear()}/${endMonth}`;
+}
+
+function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function typeLabel(type: TransactionType) {

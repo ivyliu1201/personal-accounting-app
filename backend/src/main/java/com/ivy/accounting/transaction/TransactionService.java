@@ -25,7 +25,6 @@ public class TransactionService {
 
     private static final int DEFAULT_RECENT_LIMIT = 5;
     private static final int MAX_RECENT_LIMIT = 15;
-    private static final int SUMMARY_RANGE_DAYS = 30;
     private static final int DEFAULT_HISTORY_SIZE = 10;
     private static final int MAX_HISTORY_SIZE = 20;
     private static final BigDecimal PERCENTAGE_MULTIPLIER = BigDecimal.valueOf(100);
@@ -130,7 +129,7 @@ public class TransactionService {
     ) {
         String userId = currentUserProvider.getCurrentUserId();
         LocalDate endDate = requestedEndDate == null ? LocalDate.now(clock) : requestedEndDate;
-        LocalDate startDate = requestedStartDate == null ? endDate.minusDays(SUMMARY_RANGE_DAYS - 1L) : requestedStartDate;
+        LocalDate startDate = requestedStartDate == null ? YearMonth.from(endDate).atDay(1) : requestedStartDate;
         List<CategorySummaryProjection> summaries = transactionRepository.listCategorySummaries(
                 userId,
                 type,

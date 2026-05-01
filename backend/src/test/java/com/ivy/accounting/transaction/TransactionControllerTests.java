@@ -215,7 +215,7 @@ class TransactionControllerTests {
     }
 
     @Test
-    void listCategorySummariesReturnsRecentThirtyDayTotalsAndPercentages() throws Exception {
+    void listCategorySummariesReturnsCurrentMonthTotalsAndPercentages() throws Exception {
         createTransaction("EXPENSE", "2026-04-29", 100, "飲食", "午餐");
         createTransaction("EXPENSE", "2026-04-28", 50, "飲食", "早餐");
         createTransaction("EXPENSE", "2026-04-27", 50, "交通", "捷運");
