@@ -92,13 +92,22 @@
   - 欄位格式與必填驗證可放在 DTO / request validation。
   - 跨欄位或業務規則驗證應放在 Service。
 
-## 9. Java 程式碼規則
+## 9. Repository 實作選型
+
+- Repository 層預設優先使用 Spring Data JPA。
+- 若查詢條件簡單、CRUD 行為明確、可由 JPA 穩定表達，應使用 JPA。
+- 若查詢涉及複雜 SQL、效能敏感查詢、多表聚合、特殊報表、批次更新，或 JPA 表達會明顯降低可讀性時，可改用 JDBC。
+- 使用 JDBC 前，必須在實作前回報原因、影響範圍與替代方案。
+- 不得在沒有理由的情況下混用 JPA 與 JDBC。
+- 無論使用 JPA 或 JDBC，都必須遵守 `skills/java-code-rules.md` 中的 SQL / ORM 規則。
+
+## 10. Java 程式碼規則
 
 - Java 程式碼層級規則依 `skills/java-code-rules.md` 執行。
 - 本文件不重複定義 Java 命名、常數、集合、例外、日誌、SQL / ORM 等細節。
 - 若需要產生 Java class、method 或 function，必須遵守 `skills/java-code-rules.md` 中的註解規則。
 
-## 10. Java / Spring Boot 測試策略
+## 11. Java / Spring Boot 測試策略
 
 - 核心業務邏輯與資料處理採 TDD。
 - Service 層核心邏輯優先使用單元測試。
@@ -107,7 +116,7 @@
 - 測試資料需清楚、可讀，不得依賴真實使用者資料或真實密鑰。
 - 測試執行選擇與測試報告格式，依 `skills/test-reporting.md` 執行。
 
-## 11. 資料庫與 migration 規則
+## 12. 資料庫與 migration 規則
 
 - 資料必須持久化保存。
 - 若新增或修改資料表、欄位、索引或 migration，必須在交付回報中明確列出資料庫變更內容。
@@ -115,14 +124,14 @@
 - 不得在 migration 中放入真實敏感資料。
 - 若資料庫設計與產品需求之間有未定義行為，必須回報待確認事項，不得自行擴充產品需求。
 
-## 12. 技術棧變更規則
+## 13. 技術棧變更規則
 
 - AI agent 不得自行更換主要技術棧。
 - 若需求無法由預設技術棧合理完成，必須先回報原因與替代方案。
 - 未取得使用者同意前，不得進行重大技術棧變更。
 - 不得因個人偏好、範例方便或框架預設而自行替換本文件指定的主要技術。
 
-## 13. 與產品規格衝突時
+## 14. 與產品規格衝突時
 
 若本文件與 `SPEC.md` 發生衝突，以 `SPEC.md` 為準。
 
