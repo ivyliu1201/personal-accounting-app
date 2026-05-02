@@ -39,6 +39,82 @@ interface CategoryIdRow {
   id: string;
 }
 
+interface TransactionRow {
+  id: string;
+  type: TransactionType;
+  transaction_date: string;
+  amount: number;
+  category_name: string;
+  note: string | null;
+  created_at: string;
+}
+
+const DEFAULT_RECENT_LIMIT = 5;
+const MAX_RECENT_LIMIT = 15;
+
+/**
+ * 查詢首頁最近明細。
+ *
+ * 輸入：D1 database、已驗證使用者與每頁筆數。
+ * 輸出：依建立日期由新到舊排序的最近明細。
+ * 可能錯誤：D1 查詢失敗時由 Cloudflare D1 拋出錯誤。
+ */
+export async function listRecentTransactions(
+  database: D1Database,
+  user: AuthenticatedUser,
+  limit: number
+): Promise<TransactionResponse[]> {
+  const result = await database.prepare(`
+    select t.id,
+           t.type,
+           t.transaction_date,
+           t.amount,
+           c.name as category_name,
+           t.note,
+           t.created_at
+    from accounting_transactions t
+    join categories c on c.id = t.category_id
+    where t.user_id = ?
+    order by t.created_at desc
+    limit ?
+  `)
+    .bind(user.userId, limit)
+    .all<TransactionRow>();
+
+  return result.results.map((row) => ({
+    id: row.id,
+    type: row.type,
+    transactionDate: row.transaction_date,
+    amount: row.amount,
+    categoryName: row.category_name,
+    note: row.note,
+    createdAt: row.created_at
+  }));
+}
+
+/**
+ * 解析首頁最近明細筆數。
+ *
+ * 輸入：URLSearchParams 中的 limit 參數。
+ * 輸出：合法筆數，未指定或小於等於 0 時回傳預設值，最大不超過 15。
+ * 可能錯誤：limit 不是整數時拋出 RangeError。
+ */
+export function parseRecentLimit(params: URLSearchParams): number {
+  const rawLimit = params.get('limit');
+  if (rawLimit === null || rawLimit.trim() === '') {
+    return DEFAULT_RECENT_LIMIT;
+  }
+
+  const requestedLimit = Number(rawLimit);
+  if (!Number.isInteger(requestedLimit)) {
+    throw new RangeError('Recent limit is invalid');
+  }
+  if (requestedLimit <= 0) {
+    return DEFAULT_RECENT_LIMIT;
+  }
+  return Math.min(requestedLimit, MAX_RECENT_LIMIT);
+}
+
 /**
  * 建立批次帳目。
  *

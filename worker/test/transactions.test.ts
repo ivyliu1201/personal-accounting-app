@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBatchTransactions, validateBatchCreateRequest } from '../src/transactions';
+import {
+  createBatchTransactions,
+  listRecentTransactions,
+  parseRecentLimit,
+  validateBatchCreateRequest
+} from '../src/transactions';
 import type { AuthenticatedUser } from '../src/auth';
 
 interface FakeCategoryRow {
@@ -49,6 +54,34 @@ class FakePreparedStatement {
       return (row ? { id: row.id } : null) as T | null;
     }
     throw new Error('Unsupported first query');
+  }
+
+  async all<T>() {
+    if (this.sql.includes('from accounting_transactions t')) {
+      const [userId, limit] = this.values;
+      const rows = this.database.transactions
+        .filter((transaction) => transaction.user_id === userId)
+        .sort((left, right) => right.created_at.localeCompare(left.created_at))
+        .slice(0, Number(limit))
+        .map((transaction) => {
+          const category = this.database.categories.find((candidate) => candidate.id === transaction.category_id);
+          if (!category) {
+            throw new Error('Category not found');
+          }
+          return {
+            id: transaction.id,
+            type: transaction.type,
+            transaction_date: transaction.transaction_date,
+            amount: transaction.amount,
+            category_name: category.name,
+            note: transaction.note,
+            created_at: transaction.created_at
+          };
+        });
+      return { results: rows } as { results: T[] };
+    }
+
+    throw new Error('Unsupported all query');
   }
 
   execute() {
@@ -152,6 +185,20 @@ test('validateBatchCreateRequest normalizes fields', () => {
     categoryName: '飲食',
     note: '午餐'
   }]);
+});
+
+test('parseRecentLimit defaults and caps recent limit', () => {
+  assert.equal(parseRecentLimit(new URLSearchParams()), 5);
+  assert.equal(parseRecentLimit(new URLSearchParams({ limit: '0' })), 5);
+  assert.equal(parseRecentLimit(new URLSearchParams({ limit: '10' })), 10);
+  assert.equal(parseRecentLimit(new URLSearchParams({ limit: '100' })), 15);
+});
+
+test('parseRecentLimit rejects non integer limit', () => {
+  assert.throws(
+    () => parseRecentLimit(new URLSearchParams({ limit: 'abc' })),
+    (error: unknown) => error instanceof RangeError && error.message === 'Recent limit is invalid'
+  );
 });
 
 test('createBatchTransactions uses existing default category and authenticated user id', async () => {
@@ -260,4 +307,81 @@ test('createBatchTransactions validates entire batch before writes', async () =>
   assert.equal(database.categories.length, 0);
   assert.equal(database.transactions.length, 0);
   assert.equal(database.batchSize, 0);
+});
+
+test('listRecentTransactions returns current user rows ordered by created time', async () => {
+  const database = new FakeD1Database([
+    {
+      id: 'default-food',
+      user_id: null,
+      type: 'EXPENSE',
+      name: '飲食',
+      default_category: 1,
+      created_at: fixedNow.toISOString()
+    },
+    {
+      id: 'default-salary',
+      user_id: null,
+      type: 'INCOME',
+      name: '薪資',
+      default_category: 1,
+      created_at: fixedNow.toISOString()
+    }
+  ]);
+
+  database.transactions.push(
+    {
+      id: 'older-transaction',
+      user_id: 'firebase-user-1',
+      type: 'EXPENSE',
+      transaction_date: '2026-05-01',
+      amount: 120,
+      category_id: 'default-food',
+      note: 'older',
+      created_at: '2026-05-02T07:00:00.000Z'
+    },
+    {
+      id: 'hidden-transaction',
+      user_id: 'another-user',
+      type: 'EXPENSE',
+      transaction_date: '2026-05-02',
+      amount: 999,
+      category_id: 'default-food',
+      note: 'hidden',
+      created_at: '2026-05-02T09:00:00.000Z'
+    },
+    {
+      id: 'newer-transaction',
+      user_id: 'firebase-user-1',
+      type: 'INCOME',
+      transaction_date: '2026-05-02',
+      amount: 3000,
+      category_id: 'default-salary',
+      note: null,
+      created_at: '2026-05-02T08:00:00.000Z'
+    }
+  );
+
+  const transactions = await listRecentTransactions(database as unknown as D1Database, user, 2);
+
+  assert.deepEqual(transactions, [
+    {
+      id: 'newer-transaction',
+      type: 'INCOME',
+      transactionDate: '2026-05-02',
+      amount: 3000,
+      categoryName: '薪資',
+      note: null,
+      createdAt: '2026-05-02T08:00:00.000Z'
+    },
+    {
+      id: 'older-transaction',
+      type: 'EXPENSE',
+      transactionDate: '2026-05-01',
+      amount: 120,
+      categoryName: '飲食',
+      note: 'older',
+      createdAt: '2026-05-02T07:00:00.000Z'
+    }
+  ]);
 });

@@ -1,6 +1,6 @@
 import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
 import { listCategoryOptions, parseTransactionType } from './categories';
-import { createBatchTransactions } from './transactions';
+import { createBatchTransactions, listRecentTransactions, parseRecentLimit } from './transactions';
 
 interface HealthResponse {
   status: 'ok';
@@ -86,6 +86,26 @@ export default {
           return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
         }
         return jsonResponse<ErrorResponse>({ message: 'Batch create failed' }, 500);
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/transactions/recent') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const limit = parseRecentLimit(url.searchParams);
+        const user = await authenticateFirebaseRequest(request, env);
+        const transactions = await listRecentTransactions(env.ACCOUNTING_DB, user, limit);
+        return jsonResponse(transactions);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Recent transactions loading failed' }, 500);
       }
     }
 
