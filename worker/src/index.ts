@@ -2,12 +2,21 @@ import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
 import { listCategoryOptions, parseTransactionType } from './categories';
 import {
   createBatchTransactions,
+  deleteTransaction,
+  listAnnualCashFlowTrend,
+  listCategorySummaries,
+  listHistoryTrend,
   listHistoryTransactions,
   listRecentTransactions,
   parseHistoryPage,
   parseHistorySize,
+  parseOptionalDate,
   parseRecentLimit,
-  parseRequiredDate
+  parseRequiredDate,
+  parseTrendYear,
+  resolveSummaryDateRange,
+  TransactionNotFoundError,
+  updateTransaction
 } from './transactions';
 
 interface HealthResponse {
@@ -146,6 +155,124 @@ export default {
           return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
         }
         return jsonResponse<ErrorResponse>({ message: 'History transactions loading failed' }, 500);
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/transactions/category-summary') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const type = parseTransactionType(url.searchParams);
+        const dateRange = resolveSummaryDateRange(
+          parseOptionalDate(url.searchParams, 'startDate'),
+          parseOptionalDate(url.searchParams, 'endDate')
+        );
+        const user = await authenticateFirebaseRequest(request, env);
+        const summaries = await listCategorySummaries(
+          env.ACCOUNTING_DB,
+          user,
+          type,
+          dateRange.startDate,
+          dateRange.endDate
+        );
+        return jsonResponse(summaries);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Category summary loading failed' }, 500);
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/transactions/history-trend') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const type = parseTransactionType(url.searchParams);
+        const startDate = parseRequiredDate(url.searchParams, 'startDate');
+        const endDate = parseRequiredDate(url.searchParams, 'endDate');
+        const user = await authenticateFirebaseRequest(request, env);
+        const trend = await listHistoryTrend(env.ACCOUNTING_DB, user, type, startDate, endDate);
+        return jsonResponse(trend);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'History trend loading failed' }, 500);
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/transactions/cash-flow-trend') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const year = parseTrendYear(url.searchParams);
+        const user = await authenticateFirebaseRequest(request, env);
+        const trend = await listAnnualCashFlowTrend(env.ACCOUNTING_DB, user, year);
+        return jsonResponse(trend);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Cash flow trend loading failed' }, 500);
+      }
+    }
+
+    const transactionPathMatch = url.pathname.match(/^\/api\/transactions\/([^/]+)$/);
+    if (transactionPathMatch && request.method === 'PUT') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const user = await authenticateFirebaseRequest(request, env);
+        const body = await request.json();
+        const transaction = await updateTransaction(env.ACCOUNTING_DB, user, transactionPathMatch[1], body);
+        return jsonResponse(transaction);
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          return jsonResponse<ErrorResponse>({ message: 'Request body is invalid' }, 400);
+        }
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof TransactionNotFoundError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 404);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Transaction update failed' }, 500);
+      }
+    }
+
+    if (transactionPathMatch && request.method === 'DELETE') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const user = await authenticateFirebaseRequest(request, env);
+        await deleteTransaction(env.ACCOUNTING_DB, user, transactionPathMatch[1]);
+        return jsonResponse<Record<string, never>>({});
+      } catch (error) {
+        if (error instanceof TransactionNotFoundError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 404);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Transaction delete failed' }, 500);
       }
     }
 
