@@ -32,6 +32,43 @@ This directory contains the Cloudflare Workers proof of concept for the personal
 - The auth module verifies Firebase JWT issuer and audience against `FIREBASE_PROJECT_ID`.
 - The auth module requires both Firebase `sub` and `email` claims before returning an authenticated user.
 
+## Local Worker + D1 Verification
+
+Run these commands from the `worker` directory.
+
+Apply the D1 migration to Wrangler's local D1 store:
+
+```bash
+npm run d1:migrate:local
+```
+
+Start the Worker locally on port 8787:
+
+```bash
+npm run dev:local
+```
+
+In another terminal, run the local smoke check:
+
+```bash
+npm run smoke:local
+```
+
+The smoke check verifies:
+
+- `GET /api/health` returns `200`.
+- Protected endpoints without a Firebase token return `401`.
+
+Manual frontend-to-Worker verification can be started with the Worker running:
+
+```bash
+cd ../frontend
+$env:VITE_API_PROXY_TARGET='http://localhost:8787'
+npm run dev
+```
+
+Then open `http://127.0.0.1:5173`. Successful transaction API calls still require a valid Firebase login token. Without login, protected Worker endpoints returning `401` is expected.
+
 ## D1 Notes
 
 - `ACCOUNTING_DB` is the Worker binding name.

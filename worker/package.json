@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "dev:local": "wrangler dev --local --port 8787",
+    "d1:migrate:local": "wrangler d1 migrations apply personal-accounting-poc --local",
+    "smoke:local": "tsx scripts/smoke-local.ts",
     "deploy": "wrangler deploy",
     "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
