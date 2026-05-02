@@ -35,6 +35,13 @@ export interface BatchCreateTransactionsResponse {
   transactions: TransactionResponse[];
 }
 
+export interface HistoryTransactionsResponse {
+  transactions: TransactionResponse[];
+  page: number;
+  size: number;
+  hasNext: boolean;
+}
+
 interface CategoryIdRow {
   id: string;
 }
@@ -51,6 +58,55 @@ interface TransactionRow {
 
 const DEFAULT_RECENT_LIMIT = 5;
 const MAX_RECENT_LIMIT = 15;
+const DEFAULT_HISTORY_SIZE = 10;
+const MAX_HISTORY_SIZE = 20;
+
+/**
+ * 查詢歷史查看頁明細。
+ *
+ * 輸入：D1 database、已驗證使用者、類型、日期區間、頁碼與每頁筆數。
+ * 輸出：依帳目日期由新到舊排序的明細與下一頁狀態。
+ * 可能錯誤：D1 查詢失敗時由 Cloudflare D1 拋出錯誤。
+ */
+export async function listHistoryTransactions(
+  database: D1Database,
+  user: AuthenticatedUser,
+  type: TransactionType,
+  startDate: string,
+  endDate: string,
+  page: number,
+  size: number
+): Promise<HistoryTransactionsResponse> {
+  const queryLimit = size + 1;
+  const offset = page * size;
+  const result = await database.prepare(`
+    select t.id,
+           t.type,
+           t.transaction_date,
+           t.amount,
+           c.name as category_name,
+           t.note,
+           t.created_at
+    from accounting_transactions t
+    join categories c on c.id = t.category_id
+    where t.user_id = ?
+      and t.type = ?
+      and t.transaction_date between ? and ?
+    order by t.transaction_date desc, t.created_at desc
+    limit ?
+    offset ?
+  `)
+    .bind(user.userId, type, startDate, endDate, queryLimit, offset)
+    .all<TransactionRow>();
+
+  const rows = result.results.slice(0, size);
+  return {
+    transactions: rows.map(transactionRowToResponse),
+    page,
+    size,
+    hasNext: result.results.length > size
+  };
+}
 
 /**
  * 查詢首頁最近明細。
@@ -81,7 +137,76 @@ export async function listRecentTransactions(
     .bind(user.userId, limit)
     .all<TransactionRow>();
 
-  return result.results.map((row) => ({
+  return result.results.map(transactionRowToResponse);
+}
+
+/**
+ * 解析歷史查詢日期。
+ *
+ * 輸入：URLSearchParams 與參數名稱。
+ * 輸出：YYYY-MM-DD 日期字串。
+ * 可能錯誤：日期缺失或格式錯誤時拋出 RangeError。
+ */
+export function parseRequiredDate(params: URLSearchParams, name: string): string {
+  const value = params.get(name);
+  if (value === null || value.trim() === '') {
+    throw new RangeError(`${name} is required`);
+  }
+  return validateDateValue(value, name);
+}
+
+/**
+ * 解析歷史查詢頁碼。
+ *
+ * 輸入：URLSearchParams 中的 page 參數。
+ * 輸出：合法頁碼，未指定或小於 0 時回傳 0。
+ * 可能錯誤：page 不是整數時拋出 RangeError。
+ */
+export function parseHistoryPage(params: URLSearchParams): number {
+  const rawPage = params.get('page');
+  if (rawPage === null || rawPage.trim() === '') {
+    return 0;
+  }
+
+  const requestedPage = Number(rawPage);
+  if (!Number.isInteger(requestedPage)) {
+    throw new RangeError('History page is invalid');
+  }
+  return requestedPage < 0 ? 0 : requestedPage;
+}
+
+/**
+ * 解析歷史查詢每頁筆數。
+ *
+ * 輸入：URLSearchParams 中的 size 參數。
+ * 輸出：合法每頁筆數，未指定或小於等於 0 時回傳 10，最大不超過 20。
+ * 可能錯誤：size 不是整數時拋出 RangeError。
+ */
+export function parseHistorySize(params: URLSearchParams): number {
+  const rawSize = params.get('size');
+  if (rawSize === null || rawSize.trim() === '') {
+    return DEFAULT_HISTORY_SIZE;
+  }
+
+  const requestedSize = Number(rawSize);
+  if (!Number.isInteger(requestedSize)) {
+    throw new RangeError('History size is invalid');
+  }
+  if (requestedSize <= 0) {
+    return DEFAULT_HISTORY_SIZE;
+  }
+  return Math.min(requestedSize, MAX_HISTORY_SIZE);
+}
+
+/**
+ * 將資料庫明細 row 轉成 API response。
+ *
+ * 輸入：D1 查詢 row。
+ * 輸出：前端使用的交易明細 response。
+ * 可能錯誤：無。
+ */
+function transactionRowToResponse(row: TransactionRow): TransactionResponse {
+  return {
     id: row.id,
     type: row.type,
     transactionDate: row.transaction_date,
@@ -89,7 +214,7 @@ export async function listRecentTransactions(
     categoryName: row.category_name,
     note: row.note,
     createdAt: row.created_at
-  }));
+  };
 }
 
 /**
@@ -313,10 +438,7 @@ function validateTransactionDate(transactionDate: unknown, index: number, now: D
     throw new RangeError(`Transaction ${index + 1} date is invalid`);
   }
 
-  const parsedDate = new Date(`${transactionDate}T00:00:00Z`);
-  if (Number.isNaN(parsedDate.getTime()) || transactionDate !== parsedDate.toISOString().slice(0, 10)) {
-    throw new RangeError(`Transaction ${index + 1} date is invalid`);
-  }
+  validateDateValue(transactionDate, `Transaction ${index + 1} date`);
 
   const today = now.toISOString().slice(0, 10);
   if (transactionDate > today) {
@@ -324,6 +446,25 @@ function validateTransactionDate(transactionDate: unknown, index: number, now: D
   }
 
   return transactionDate;
+}
+
+/**
+ * 驗證日期字串是否為實際存在的 YYYY-MM-DD。
+ *
+ * 輸入：日期字串與錯誤訊息欄位名稱。
+ * 輸出：原日期字串。
+ * 可能錯誤：格式錯誤或非實際日期時拋出 RangeError。
+ */
+function validateDateValue(dateValue: string, fieldName: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    throw new RangeError(`${fieldName} is invalid`);
+  }
+
+  const parsedDate = new Date(`${dateValue}T00:00:00Z`);
+  if (Number.isNaN(parsedDate.getTime()) || dateValue !== parsedDate.toISOString().slice(0, 10)) {
+    throw new RangeError(`${fieldName} is invalid`);
+  }
+  return dateValue;
 }
 
 /**

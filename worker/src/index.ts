@@ -1,6 +1,14 @@
 import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
 import { listCategoryOptions, parseTransactionType } from './categories';
-import { createBatchTransactions, listRecentTransactions, parseRecentLimit } from './transactions';
+import {
+  createBatchTransactions,
+  listHistoryTransactions,
+  listRecentTransactions,
+  parseHistoryPage,
+  parseHistorySize,
+  parseRecentLimit,
+  parseRequiredDate
+} from './transactions';
 
 interface HealthResponse {
   status: 'ok';
@@ -106,6 +114,38 @@ export default {
           return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
         }
         return jsonResponse<ErrorResponse>({ message: 'Recent transactions loading failed' }, 500);
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/transactions/history') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const type = parseTransactionType(url.searchParams);
+        const startDate = parseRequiredDate(url.searchParams, 'startDate');
+        const endDate = parseRequiredDate(url.searchParams, 'endDate');
+        const page = parseHistoryPage(url.searchParams);
+        const size = parseHistorySize(url.searchParams);
+        const user = await authenticateFirebaseRequest(request, env);
+        const transactions = await listHistoryTransactions(
+          env.ACCOUNTING_DB,
+          user,
+          type,
+          startDate,
+          endDate,
+          page,
+          size
+        );
+        return jsonResponse(transactions);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'History transactions loading failed' }, 500);
       }
     }
 
