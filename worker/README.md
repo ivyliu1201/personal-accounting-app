@@ -6,6 +6,7 @@ This directory contains the Cloudflare Workers proof of concept for the personal
 
 - `GET /api/health`
 - `GET /api/auth/me` Firebase authentication POC endpoint
+- `GET /api/transactions/categories?type=EXPENSE|INCOME`
 - Local Worker TypeScript setup
 - D1 migration draft matching the current PostgreSQL MVP schema
 

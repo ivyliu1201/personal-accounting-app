@@ -1,4 +1,5 @@
 import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
+import { listCategoryOptions, parseTransactionType } from './categories';
 
 interface HealthResponse {
   status: 'ok';
@@ -41,6 +42,26 @@ export default {
           return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
         }
         return jsonResponse<ErrorResponse>({ message: 'Authentication failed' }, 401);
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/transactions/categories') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const type = parseTransactionType(url.searchParams);
+        const user = await authenticateFirebaseRequest(request, env);
+        const categories = await listCategoryOptions(env.ACCOUNTING_DB, user, type);
+        return jsonResponse(categories);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Categories loading failed' }, 500);
       }
     }
 

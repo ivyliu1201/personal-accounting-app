@@ -3,6 +3,7 @@ import type { JWTPayload } from 'jose';
 
 export interface WorkerEnv {
   FIREBASE_PROJECT_ID?: string;
+  ACCOUNTING_DB?: D1Database;
 }
 
 export interface AuthenticatedUser {
