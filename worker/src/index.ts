@@ -1,5 +1,6 @@
 import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
 import { listCategoryOptions, parseTransactionType } from './categories';
+import { createBatchTransactions } from './transactions';
 
 interface HealthResponse {
   status: 'ok';
@@ -62,6 +63,29 @@ export default {
           return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
         }
         return jsonResponse<ErrorResponse>({ message: 'Categories loading failed' }, 500);
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/transactions/batch') {
+      try {
+        if (!env.ACCOUNTING_DB) {
+          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
+        }
+        const user = await authenticateFirebaseRequest(request, env);
+        const body = await request.json();
+        const response = await createBatchTransactions(env.ACCOUNTING_DB, user, body);
+        return jsonResponse(response);
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          return jsonResponse<ErrorResponse>({ message: 'Request body is invalid' }, 400);
+        }
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Batch create failed' }, 500);
       }
     }
 
