@@ -1,13 +1,49 @@
 <template>
   <main class="app-shell">
     <nav class="top-bar" aria-label="主導覽">
-      <strong>個人記帳</strong>
+      <strong class="brand-mark">
+        <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+          <path d="M8.5 8h7M8.5 12h3M14.5 12h1M8.5 16h2M13.5 16h2" />
+        </svg>
+        個人記帳
+      </strong>
       <div class="nav-links">
-        <button type="button" :class="{ active: currentView === 'home' }" @click="showHome">首頁</button>
-        <button type="button" :class="{ active: currentView === 'history' }" @click="showHistory">歷史查看</button>
+        <button type="button" :class="{ active: currentView === 'home' }" @click="showHome">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 11.5 12 5l8 6.5V20h-5v-5H9v5H4v-8.5z" />
+          </svg>
+          首頁
+        </button>
+        <button type="button" :class="{ active: currentView === 'history' }" @click="showHistory">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 4h10a2 2 0 0 1 2 2v14l-3-1.5L13 20l-3-1.5L7 20l-2-1V6a2 2 0 0 1 2-2z" />
+            <path d="M8.5 9h7M8.5 13h5" />
+          </svg>
+          歷史查看
+        </button>
         <span v-if="currentUser" class="user-pill">{{ currentUserDisplayName }}</span>
-        <button v-if="currentUser" type="button" @click="signOutUser">登出</button>
-        <button v-else type="button" @click="signInWithGoogle">Google 登入</button>
+        <button v-if="currentUser" type="button" @click="signOutUser">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 5H6v14h4" />
+            <path d="M14 8l4 4-4 4M18 12H9" />
+          </svg>
+          登出
+        </button>
+        <button v-else type="button" @click="signInWithGoogle">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5a7 7 0 1 0 6.4 9.8" />
+            <path d="M12 12h7" />
+          </svg>
+          Google 登入
+        </button>
+        <button v-if="!currentUser" type="button" @click="signInWithDemoUser">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 19c1.2-1.8 2.6-2.7 4-2.7s2.8.9 4 2.7" />
+            <path d="M12 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+          </svg>
+          假帳號登入（載入假資料）
+        </button>
       </div>
     </nav>
 
@@ -70,14 +106,24 @@
               aria-label="移除這筆"
               @click="removeRow(index)"
             >
-              X
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 7l10 10M17 7 7 17" />
+              </svg>
             </button>
           </div>
         </div>
 
         <div class="actions">
-          <button type="button" @click="addRow">新增一列</button>
+          <button type="button" @click="addRow">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            新增一列
+          </button>
           <button type="button" :disabled="!canSubmit || isSubmitting" @click="submitBatch">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12.5 10 17 19 7" />
+            </svg>
             {{ isSubmitting ? '送出中' : '送出' }}
           </button>
         </div>
@@ -124,7 +170,12 @@
             :loading="isLoadingRecent"
             empty-label="目前沒有資料"
           />
-          <button type="button" @click="showHistory">查看全部</button>
+          <button type="button" @click="showHistory">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+            查看全部
+          </button>
         </section>
       </section>
     </section>
@@ -158,9 +209,19 @@
         />
 
         <div class="pager">
-          <button type="button" :disabled="historyPage === 0 || isLoadingHistory" @click="previousHistoryPage">上一頁</button>
+          <button type="button" :disabled="historyPage === 0 || isLoadingHistory" @click="previousHistoryPage">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 6 9 12l6 6" />
+            </svg>
+            上一頁
+          </button>
           <span>第 {{ historyPage + 1 }} 頁</span>
-          <button type="button" :disabled="!historyHasNext || isLoadingHistory" @click="nextHistoryPage">下一頁</button>
+          <button type="button" :disabled="!historyHasNext || isLoadingHistory" @click="nextHistoryPage">
+            下一頁
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </button>
         </div>
       </section>
 
@@ -321,6 +382,9 @@
         <div class="modal-actions">
           <button type="button" @click="closeEditDialog">取消</button>
           <button type="button" :disabled="!canSubmitEdit || isSavingEdit" @click="submitEdit">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12.5 10 17 19 7" />
+            </svg>
             {{ isSavingEdit ? '儲存中' : '確定' }}
           </button>
         </div>
@@ -348,10 +412,21 @@
         <div class="modal-actions">
           <button type="button" @click="closeDeleteDialog">取消</button>
           <button type="button" class="danger-button" :disabled="isDeleting" @click="confirmDelete">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 9h8M10 9v8M14 9v8" />
+              <path d="M7 9l1 11h8l1-11M9 6h6l1 3H8l1-3z" />
+            </svg>
             {{ isDeleting ? '刪除中' : '確認刪除' }}
           </button>
         </div>
       </section>
+    </div>
+
+    <div class="watercolor-mascot watercolor-mascot-blue" aria-hidden="true">
+      <img :src="watercolorMascotUrl" alt="" class="mascot-image" />
+    </div>
+    <div class="watercolor-mascot watercolor-mascot-pink" aria-hidden="true">
+      <img :src="watercolorMascotPinkUrl" alt="" class="mascot-image" />
     </div>
 
     <p v-if="message" class="message" role="status">{{ message }}</p>
@@ -370,9 +445,15 @@ import {
 } from 'firebase/auth';
 import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue';
 import { formatDateTime } from './dateFormat';
+import watercolorMascotUrl from './assets/watercolor-mascot.png';
+import watercolorMascotPinkUrl from './assets/watercolor-mascot-pink.png';
 
 type TransactionType = 'INCOME' | 'EXPENSE';
 type SummaryMode = TransactionType | 'CASH_FLOW';
+type AppUser = User | {
+  displayName: string;
+  email: string;
+};
 
 interface EntryRow {
   id: number;
@@ -463,7 +544,7 @@ const defaultIncomeCategories = ['投資', '薪資'];
 const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
 const DONUT_RADIUS = 42;
 const donutCircumference = 2 * Math.PI * DONUT_RADIUS;
-const chartColors = ['#3273dc', '#1f9d55', '#d97706', '#8b5cf6', '#dc2626', '#0891b2', '#4b5563', '#be185d'];
+const chartColors = ['#73C8DF', '#9DDCF0', '#BDECD7', '#FFE58F', '#F7A7A0', '#BBD6FF', '#82B9D6', '#C8EFFF'];
 const TREND_CHART_LEFT = 70;
 const TREND_CHART_RIGHT = 346;
 const TREND_CHART_TOP = 26;
@@ -524,7 +605,10 @@ const deletingTransaction = ref<TransactionResponse | null>(null);
 const editForm = ref<EditForm>(createEditForm());
 const isSavingEdit = ref(false);
 const isDeleting = ref(false);
-const currentUser = ref<User | null>(null);
+const currentUser = ref<AppUser | null>(null);
+const demoMode = ref(false);
+const demoTransactions = ref<TransactionResponse[]>([]);
+let demoTransactionId = 1;
 
 const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
@@ -724,6 +808,9 @@ const DonutBlock = defineComponent({
 onMounted(() => {
   if (firebaseAuth) {
     onAuthStateChanged(firebaseAuth, (user) => {
+      if (demoMode.value) {
+        return;
+      }
       currentUser.value = user;
       if (user) {
         void refreshAfterMutation();
@@ -840,6 +927,14 @@ async function submitBatch() {
 
   isSubmitting.value = true;
   try {
+    if (demoMode.value) {
+      addDemoTransactions();
+      rows.value = [createRow()];
+      await refreshAfterMutation();
+      showMessage('新增完成（假帳號）');
+      return;
+    }
+
     const response = await apiFetch('/api/transactions/batch', {
       method: 'POST',
       headers: {
@@ -916,6 +1011,15 @@ async function submitEdit() {
 
   isSavingEdit.value = true;
   try {
+    if (demoMode.value) {
+      updateDemoTransaction(editingTransaction.value.id);
+      editingTransaction.value = null;
+      editForm.value = createEditForm();
+      await refreshAfterMutation();
+      showMessage('更新完成（假帳號）');
+      return;
+    }
+
     const response = await apiFetch(`/api/transactions/${editingTransaction.value.id}`, {
       method: 'PUT',
       headers: {
@@ -967,6 +1071,17 @@ async function confirmDelete() {
 
   isDeleting.value = true;
   try {
+    if (demoMode.value) {
+      deleteDemoTransaction(deletingTransaction.value.id);
+      deletingTransaction.value = null;
+      if (deletedFromHistoryLastRow) {
+        historyPage.value -= 1;
+      }
+      await refreshAfterMutation();
+      showMessage('刪除完成（假帳號）');
+      return;
+    }
+
     const response = await apiFetch(`/api/transactions/${deletingTransaction.value.id}`, {
       method: 'DELETE'
     });
@@ -1002,6 +1117,11 @@ function getEditCategoryName() {
 }
 
 async function refreshAfterMutation() {
+  if (demoMode.value) {
+    await refreshDemoData();
+    return;
+  }
+
   if (currentView.value === 'history') {
     await Promise.all([
       loadHistory(),
@@ -1039,10 +1159,19 @@ function showHistory() {
     return;
   }
   currentView.value = 'history';
+  if (demoMode.value) {
+    void refreshDemoData();
+    return;
+  }
   void loadHistoryView();
 }
 
 async function loadCategories(showError = true) {
+  if (demoMode.value) {
+    loadDemoCategories();
+    return true;
+  }
+
   try {
     const [expenseResponse, incomeResponse] = await Promise.all([
       apiFetch('/api/transactions/categories?type=EXPENSE'),
@@ -1070,6 +1199,11 @@ async function loadCategories(showError = true) {
 }
 
 async function loadRecent(showError = true) {
+  if (demoMode.value) {
+    loadDemoRecent();
+    return true;
+  }
+
   isLoadingRecent.value = true;
   try {
     const response = await apiFetch(`/api/transactions/recent?limit=${recentLimit.value}`);
@@ -1093,6 +1227,10 @@ async function resetHistoryPageAndLoad() {
   if (historySummaryMode.value !== 'CASH_FLOW') {
     historySummaryMode.value = historyType.value;
   }
+  if (demoMode.value) {
+    await refreshDemoData();
+    return;
+  }
   await loadHistoryView();
 }
 
@@ -1101,6 +1239,10 @@ async function previousHistoryPage() {
     return;
   }
   historyPage.value -= 1;
+  if (demoMode.value) {
+    loadDemoHistory();
+    return;
+  }
   await loadHistory();
 }
 
@@ -1109,14 +1251,27 @@ async function nextHistoryPage() {
     return;
   }
   historyPage.value += 1;
+  if (demoMode.value) {
+    loadDemoHistory();
+    return;
+  }
   await loadHistory();
 }
 
 async function loadHistoryView() {
+  if (demoMode.value) {
+    await refreshDemoData();
+    return;
+  }
   await Promise.all([loadHistory(), loadHistoryCategorySummary(), loadHistoryTrend()]);
 }
 
 async function loadHistory() {
+  if (demoMode.value) {
+    loadDemoHistory();
+    return true;
+  }
+
   if (historyStartDate.value > historyEndDate.value) {
     showMessage('開始日期不可晚於結束日期');
     return false;
@@ -1150,6 +1305,11 @@ async function loadHistory() {
 }
 
 async function loadCategorySummary(showError = true) {
+  if (demoMode.value) {
+    loadDemoHomeSummary();
+    return true;
+  }
+
   isLoadingSummary.value = true;
   try {
     const [expenseSummaries, incomeSummaries] = await Promise.all([
@@ -1170,6 +1330,11 @@ async function loadCategorySummary(showError = true) {
 }
 
 async function loadHistoryCategorySummary() {
+  if (demoMode.value) {
+    loadDemoHistorySummary();
+    return true;
+  }
+
   if (historyStartDate.value > historyEndDate.value) {
     historyExpenseCategorySummaries.value = [];
     historyIncomeCategorySummaries.value = [];
@@ -1194,6 +1359,11 @@ async function loadHistoryCategorySummary() {
 }
 
 async function loadHistoryTrend() {
+  if (demoMode.value) {
+    loadDemoHistoryTrend();
+    return true;
+  }
+
   isLoadingHistoryTrend.value = true;
   try {
     const params = new URLSearchParams({
@@ -1241,7 +1411,29 @@ async function signInWithGoogle() {
   }
 }
 
+function signInWithDemoUser() {
+  demoMode.value = true;
+  currentUser.value = {
+    displayName: '假帳號',
+    email: 'demo@example.com'
+  };
+  currentView.value = 'home';
+  resetProtectedData();
+  const seededCount = seedDemoTransactions();
+  void refreshDemoData();
+  showMessage(`已載入 ${seededCount} 筆假資料`);
+}
+
 async function signOutUser() {
+  if (demoMode.value) {
+    demoMode.value = false;
+    currentUser.value = null;
+    demoTransactions.value = [];
+    resetProtectedData();
+    showMessage('已登出');
+    return;
+  }
+
   if (!firebaseAuth) {
     return;
   }
@@ -1264,6 +1456,217 @@ function resetProtectedData() {
     EXPENSE: defaultExpenseCategories,
     INCOME: defaultIncomeCategories
   };
+}
+
+// TODO(中): 假帳號模式僅供本機前端展示，正式資料串接恢復後應移除或改成明確測試入口。
+function seedDemoTransactions() {
+  demoTransactionId = 1;
+  const currentMonthFirstDate = defaultMonthStartDate;
+  const currentMonthSecondDate = formatDemoMonthDate(2);
+  const currentMonthThirdDate = formatDemoMonthDate(3);
+  const yesterdayDate = formatRelativeDate(-1);
+  const previousMonthDate = formatMonthOffsetDate(-1, 18);
+  const twoMonthsAgoDate = formatMonthOffsetDate(-2, 12);
+
+  demoTransactions.value = [
+    createDemoTransaction('INCOME', currentMonthFirstDate, 58000, '薪資', '假資料：本月薪資', 1),
+    createDemoTransaction('EXPENSE', currentMonthFirstDate, 1200, '飲食', '假資料：早餐與晚餐', 2),
+    createDemoTransaction('EXPENSE', currentMonthSecondDate, 760, '交通', '假資料：通勤交通', 3),
+    createDemoTransaction('EXPENSE', currentMonthThirdDate, 1680, '繳費', '假資料：手機費', 4),
+    createDemoTransaction('EXPENSE', yesterdayDate, 900, '運動', '假資料：健身課', 5),
+    createDemoTransaction('EXPENSE', today, 320, '社交', '假資料：咖啡聚會', 6),
+    createDemoTransaction('INCOME', today, 2200, '投資', '假資料：股息收入', 7),
+    createDemoTransaction('EXPENSE', previousMonthDate, 2400, '自我成長', '假資料：線上課程', 8),
+    createDemoTransaction('EXPENSE', previousMonthDate, 1850, '治裝費', '假資料：衣物', 9),
+    createDemoTransaction('INCOME', twoMonthsAgoDate, 1600, '投資', '假資料：投資收入', 10),
+    createDemoTransaction('EXPENSE', twoMonthsAgoDate, 1100, '飲食', '假資料：聚餐', 11)
+  ];
+  return demoTransactions.value.length;
+}
+
+function createDemoTransaction(
+  type: TransactionType,
+  transactionDate: string,
+  amount: number,
+  categoryName: string,
+  note: string,
+  createdOffsetHours: number
+): TransactionResponse {
+  const createdAtDate = new Date(todayDate.getTime() - (createdOffsetHours * 60 * 60 * 1000));
+  return {
+    id: `demo-seed-${demoTransactionId++}`,
+    type,
+    transactionDate,
+    amount,
+    categoryName,
+    note,
+    createdAt: createdAtDate.toISOString()
+  };
+}
+
+function formatDemoMonthDate(day: number) {
+  const safeDay = Math.min(day, todayDate.getDate());
+  return formatDateInputValue(new Date(todayDate.getFullYear(), todayDate.getMonth(), safeDay));
+}
+
+function formatRelativeDate(offsetDays: number) {
+  const date = new Date(todayDate);
+  date.setDate(date.getDate() + offsetDays);
+  if (date > todayDate) {
+    return today;
+  }
+  return formatDateInputValue(date);
+}
+
+function formatMonthOffsetDate(monthOffset: number, day: number) {
+  const date = new Date(todayDate.getFullYear(), todayDate.getMonth() + monthOffset, day);
+  if (date > todayDate) {
+    return today;
+  }
+  return formatDateInputValue(date);
+}
+
+async function refreshDemoData() {
+  loadDemoCategories();
+  loadDemoRecent();
+  loadDemoHomeSummary();
+  if (currentView.value === 'history') {
+    loadDemoHistory();
+    loadDemoHistorySummary();
+    loadDemoHistoryTrend();
+  }
+}
+
+function addDemoTransactions() {
+  const now = new Date().toISOString();
+  const createdTransactions = rows.value.map((row) => ({
+    id: `demo-${demoTransactionId++}`,
+    type: row.type as TransactionType,
+    transactionDate: row.transactionDate,
+    amount: Number(row.amount),
+    categoryName: getCategoryName(row),
+    note: row.note.trim() || null,
+    createdAt: now
+  }));
+  demoTransactions.value = [...createdTransactions, ...demoTransactions.value];
+}
+
+function updateDemoTransaction(transactionId: string) {
+  demoTransactions.value = demoTransactions.value.map((transaction) => {
+    if (transaction.id !== transactionId) {
+      return transaction;
+    }
+    return {
+      ...transaction,
+      type: editForm.value.type,
+      transactionDate: editForm.value.transactionDate,
+      amount: Number(editForm.value.amount),
+      categoryName: getEditCategoryName(),
+      note: editForm.value.note.trim() || null
+    };
+  });
+}
+
+function deleteDemoTransaction(transactionId: string) {
+  demoTransactions.value = demoTransactions.value.filter((transaction) => transaction.id !== transactionId);
+}
+
+function loadDemoCategories() {
+  categoryOptions.value = {
+    EXPENSE: mergeCategories(defaultExpenseCategories, listDemoCategories('EXPENSE')),
+    INCOME: mergeCategories(defaultIncomeCategories, listDemoCategories('INCOME'))
+  };
+}
+
+function listDemoCategories(type: TransactionType) {
+  return demoTransactions.value
+    .filter((transaction) => transaction.type === type)
+    .map((transaction) => transaction.categoryName);
+}
+
+function loadDemoRecent() {
+  recentTransactions.value = [...demoTransactions.value]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, recentLimit.value);
+}
+
+function loadDemoHomeSummary() {
+  expenseCategorySummaries.value = buildDemoCategorySummary('EXPENSE', defaultMonthStartDate, today);
+  incomeCategorySummaries.value = buildDemoCategorySummary('INCOME', defaultMonthStartDate, today);
+}
+
+function loadDemoHistory() {
+  if (historyStartDate.value > historyEndDate.value) {
+    historyTransactions.value = [];
+    historyHasNext.value = false;
+    showMessage('開始日期不可晚於結束日期');
+    return;
+  }
+
+  const filteredTransactions = filterDemoTransactions(historyType.value, historyStartDate.value, historyEndDate.value)
+    .sort((left, right) => right.transactionDate.localeCompare(left.transactionDate));
+  const start = historyPage.value * historySize.value;
+  historyTransactions.value = filteredTransactions.slice(start, start + historySize.value);
+  historyHasNext.value = filteredTransactions.length > start + historySize.value;
+}
+
+function loadDemoHistorySummary() {
+  historyExpenseCategorySummaries.value = buildDemoCategorySummary('EXPENSE', historyStartDate.value, historyEndDate.value);
+  historyIncomeCategorySummaries.value = buildDemoCategorySummary('INCOME', historyStartDate.value, historyEndDate.value);
+}
+
+function loadDemoHistoryTrend() {
+  const year = historyTrendYear.value;
+  const yearlyTransactions = demoTransactions.value.filter((transaction) => transaction.transactionDate.startsWith(`${year}-`));
+  if (yearlyTransactions.length === 0) {
+    historyTrendPoints.value = [];
+    return;
+  }
+
+  let cumulativeAmount = 0;
+  historyTrendPoints.value = Array.from({ length: 12 }, (_, index) => {
+    const month = String(index + 1).padStart(2, '0');
+    const label = `${year}-${month}`;
+    const amount = yearlyTransactions
+      .filter((transaction) => transaction.transactionDate.startsWith(label))
+      .reduce((total, transaction) => {
+        return total + (transaction.type === 'INCOME' ? transaction.amount : -transaction.amount);
+      }, 0);
+    cumulativeAmount += amount;
+    return {
+      label,
+      amount,
+      cumulativeAmount
+    };
+  });
+}
+
+function buildDemoCategorySummary(type: TransactionType, startDate: string, endDate: string) {
+  const groupedAmounts = new Map<string, number>();
+  for (const transaction of filterDemoTransactions(type, startDate, endDate)) {
+    groupedAmounts.set(transaction.categoryName, (groupedAmounts.get(transaction.categoryName) ?? 0) + transaction.amount);
+  }
+
+  const total = Array.from(groupedAmounts.values()).reduce((sum, amount) => sum + amount, 0);
+  if (total <= 0) {
+    return [];
+  }
+
+  return Array.from(groupedAmounts.entries())
+    .map(([categoryName, amount]) => ({
+      categoryName,
+      amount,
+      percentage: calculatePercentage(amount, total)
+    }))
+    .sort((left, right) => right.amount - left.amount);
+}
+
+function filterDemoTransactions(type: TransactionType, startDate: string, endDate: string) {
+  return demoTransactions.value.filter((transaction) => {
+    return transaction.type === type
+      && transaction.transactionDate >= startDate
+      && transaction.transactionDate <= endDate;
+  });
 }
 
 function getSignInErrorMessage(error: unknown) {

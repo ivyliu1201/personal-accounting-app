@@ -1,4 +1,5 @@
 .env
+frontend/.env*
 
 # Java / Maven
 backend/target/
@@ -11,6 +12,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.tmp-test/
 frontend/*.tsbuildinfo
+frontend/vite-dev.*
 
 # Cloudflare Workers POC
 worker/node_modules/
@@ -23,6 +25,7 @@ worker/.dev.vars
 
 # Secrets
 *firebase-admin*.json
+firebase/
 secrets/
 
 # IDE
