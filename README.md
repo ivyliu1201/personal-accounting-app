@@ -6,6 +6,29 @@
 
 目前建議用本機 Worker + 本機前端測試最新功能。
 
+最快方式：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-local-worker-app.ps1
+```
+
+啟動後開啟：
+
+```text
+http://localhost:5173
+```
+
+這個 script 會：
+
+- 讀取 `.env`。
+- 確認 `worker/.dev.vars` 存在；若不存在，會用 `.env` 的 `VITE_FIREBASE_PROJECT_ID` 建立本機檔案。
+- 套用 Wrangler local D1 migration。
+- 啟動 Worker `http://localhost:8787`。
+- 啟動前端 `http://localhost:5173`，並讓前端 API 指向 Worker。
+- 執行 Worker local smoke check。
+
+手動方式如下。
+
 先啟動 Worker：
 
 ```powershell
