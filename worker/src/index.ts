@@ -1,6 +1,12 @@
+import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
+
 interface HealthResponse {
   status: 'ok';
   service: 'personal-accounting-worker';
+}
+
+interface ErrorResponse {
+  message: string;
 }
 
 const JSON_HEADERS = {
@@ -16,7 +22,7 @@ export default {
    * 輸出：健康檢查 JSON 或 404 JSON。
    * 可能錯誤：本 POC 不存取外部資源，預期不會拋出業務錯誤。
    */
-  fetch(request: Request): Response {
+  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
@@ -24,6 +30,18 @@ export default {
         status: 'ok',
         service: 'personal-accounting-worker'
       });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/auth/me') {
+      try {
+        const user = await authenticateFirebaseRequest(request, env);
+        return jsonResponse(user);
+      } catch (error) {
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Authentication failed' }, 401);
+      }
     }
 
     return jsonResponse(

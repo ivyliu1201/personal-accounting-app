@@ -5,16 +5,24 @@ This directory contains the Cloudflare Workers proof of concept for the personal
 ## Current Scope
 
 - `GET /api/health`
+- `GET /api/auth/me` Firebase authentication POC endpoint
 - Local Worker TypeScript setup
 - D1 migration draft matching the current PostgreSQL MVP schema
 
 ## Not Yet Implemented
 
-- Firebase ID token verification
 - Accounting API endpoints
 - Cloudflare D1 cloud database creation
 - Data migration from PostgreSQL to D1
 - Deployment
+
+## Firebase Auth Notes
+
+- The Worker validates Firebase ID tokens from `Authorization: Bearer <token>`.
+- `FIREBASE_PROJECT_ID` must be configured before using protected endpoints.
+- `FIREBASE_PROJECT_ID` is not a secret, but real secrets must still use Cloudflare secrets.
+- The auth module verifies Firebase JWT issuer and audience against `FIREBASE_PROJECT_ID`.
+- The auth module requires both Firebase `sub` and `email` claims before returning an authenticated user.
 
 ## D1 Notes
 
