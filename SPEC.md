@@ -78,6 +78,8 @@
 ### 3.1 登入方式
 - 登入方式：Google 帳號登入
 - 驗證方式：Firebase Authentication
+- 架構遷移期間，登入驗證暫定維持 Firebase Authentication。
+- 若後續改用 Cloudflare Access 或其他登入驗證方式，必須先更新本文件與 `ARCHITECTURE.md`，不得直接修改程式碼造成規格與實作不一致。
 
 ### 3.2 未登入狀態
 - 可先看到首頁版型

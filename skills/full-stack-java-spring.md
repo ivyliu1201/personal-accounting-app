@@ -35,6 +35,17 @@
 - 後端：Java 21 + Spring Boot 4.x 穩定版
 - 登入驗證：Firebase Authentication
 
+### 3.1 本專案 Cloudflare 遷移決策
+
+本專案已新增 `ARCHITECTURE.md` 記錄 Cloudflare Workers / D1 遷移目標。
+
+- 遷移完成前，既有 Spring Boot + PostgreSQL 架構仍是目前可執行實作。
+- 目標後端：Cloudflare Workers。
+- 目標資料庫：Cloudflare D1。
+- 登入驗證：暫定維持 Firebase Authentication。
+- Cloudflare Access、Workers Paid、D1 付費額度或任何需要綁定信用卡的操作，皆必須先取得使用者確認。
+- 未完成對應文件更新與小步驟確認前，不得直接移除 Spring Boot、PostgreSQL、Firebase Authentication 或既有 migration。
+
 ## 4. 版本選型原則
 
 - Java 使用 `21`。
