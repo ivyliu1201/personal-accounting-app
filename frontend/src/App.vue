@@ -359,7 +359,7 @@
 </template>
 
 <script setup lang="ts">
-import { initializeApp } from 'firebase/app';
+import { FirebaseError, initializeApp } from 'firebase/app';
 import {
   GoogleAuthProvider,
   getAuth,
@@ -725,11 +725,13 @@ onMounted(() => {
   if (firebaseAuth) {
     onAuthStateChanged(firebaseAuth, (user) => {
       currentUser.value = user;
+      if (user) {
+        void refreshAfterMutation();
+        return;
+      }
+      resetProtectedData();
     });
   }
-  void loadCategories();
-  void loadRecent();
-  void loadCategorySummary();
 });
 
 function createRow(): EntryRow {
@@ -1032,6 +1034,10 @@ function showHome() {
 }
 
 function showHistory() {
+  if (!currentUser.value) {
+    showMessage('請先登入');
+    return;
+  }
   currentView.value = 'history';
   void loadHistoryView();
 }
@@ -1231,7 +1237,7 @@ async function signInWithGoogle() {
     showMessage('登入完成');
     await refreshAfterMutation();
   } catch (error) {
-    showMessage(error instanceof Error ? '登入失敗，請稍後再試' : '登入失敗');
+    showMessage(getSignInErrorMessage(error));
   }
 }
 
@@ -1242,7 +1248,29 @@ async function signOutUser() {
 
   await signOut(firebaseAuth);
   currentUser.value = null;
+  resetProtectedData();
   showMessage('已登出');
+}
+
+function resetProtectedData() {
+  recentTransactions.value = [];
+  historyTransactions.value = [];
+  expenseCategorySummaries.value = [];
+  incomeCategorySummaries.value = [];
+  historyExpenseCategorySummaries.value = [];
+  historyIncomeCategorySummaries.value = [];
+  historyTrendPoints.value = [];
+  categoryOptions.value = {
+    EXPENSE: defaultExpenseCategories,
+    INCOME: defaultIncomeCategories
+  };
+}
+
+function getSignInErrorMessage(error: unknown) {
+  if (error instanceof FirebaseError) {
+    return `登入失敗：${error.code}`;
+  }
+  return '登入失敗，請稍後再試';
 }
 
 async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
