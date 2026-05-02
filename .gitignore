@@ -12,6 +12,11 @@ frontend/dist/
 frontend/.tmp-test/
 frontend/*.tsbuildinfo
 
+# Cloudflare Workers POC
+worker/node_modules/
+worker/dist/
+worker/.wrangler/
+
 # Logs
 *.log
 

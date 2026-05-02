@@ -1,0 +1,7 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "personal-accounting-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-02",
+  "workers_dev": true
+}
