@@ -8,12 +8,18 @@ This directory contains the Cloudflare Workers proof of concept for the personal
 - `GET /api/auth/me` Firebase authentication POC endpoint
 - `GET /api/transactions/categories?type=EXPENSE|INCOME`
 - `POST /api/transactions/batch`
+- `GET /api/transactions/recent?limit=5|10|15`
+- `GET /api/transactions/history?type=EXPENSE|INCOME&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&page=0&size=10`
+- `GET /api/transactions/category-summary?type=EXPENSE|INCOME&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
+- `GET /api/transactions/history-trend?type=EXPENSE|INCOME&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
+- `GET /api/transactions/cash-flow-trend?year=YYYY`
+- `PUT /api/transactions/{id}`
+- `DELETE /api/transactions/{id}`
 - Local Worker TypeScript setup
 - D1 migration draft matching the current PostgreSQL MVP schema
 
 ## Not Yet Implemented
 
-- Accounting API endpoints
 - Cloudflare D1 cloud database creation
 - Data migration from PostgreSQL to D1
 - Deployment

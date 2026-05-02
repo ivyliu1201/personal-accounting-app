@@ -116,9 +116,13 @@ VITE_FIREBASE_PROJECT_ID=your-project-id
 VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
 VITE_FIREBASE_APP_ID=your-web-app-id
+VITE_API_BASE_URL=
+VITE_API_PROXY_TARGET=http://localhost:8080
 ```
 
 Firebase Authentication 預設關閉，後端會使用 `APP_DEV_USER_ID` 作為本機開發使用者。
 啟用 Firebase 時，將 `APP_FIREBASE_ENABLED` 設為 `true`，並設定 `FIREBASE_SERVICE_ACCOUNT_PATH` 指向本機 service account JSON。
 `APP_ALLOWED_USER_EMAILS` 使用逗號分隔，之後新增可登入的 Gmail 只需要追加到此變數。
 前端 Firebase Web 設定使用 `VITE_FIREBASE_*` 變數，這些值會在前端 build 時注入。
+前端 API 預設使用同網域 `/api`；本機 Vite dev proxy 可用 `VITE_API_PROXY_TARGET` 切換至 Spring Boot 或 Worker，例如 `http://localhost:8080` 或 `http://localhost:8787`。
+若設定 `VITE_API_BASE_URL`，前端會直接把 `/api/...` 請求改送到該 base URL；跨網域使用 Worker 時需先完成 Worker CORS 設定。

@@ -482,6 +482,7 @@ const firebaseConfigured = Object.values(firebaseConfig).every((value) => Boolea
 const firebaseApp = firebaseConfigured ? initializeApp(firebaseConfig) : null;
 const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 const googleProvider = new GoogleAuthProvider();
+const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 const todayDate = new Date();
 const today = formatDateInputValue(todayDate);
@@ -1250,10 +1251,24 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
     const token = await firebaseAuth.currentUser.getIdToken();
     headers.set('Authorization', `Bearer ${token}`);
   }
-  return fetch(input, {
+  return fetch(resolveApiInput(input), {
     ...init,
     headers
   });
+}
+
+function resolveApiInput(input: RequestInfo | URL): RequestInfo | URL {
+  if (!apiBaseUrl || typeof input !== 'string' || !input.startsWith('/api/')) {
+    return input;
+  }
+  return `${apiBaseUrl}${input}`;
+}
+
+function normalizeApiBaseUrl(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().replace(/\/$/, '');
 }
 
 async function getErrorMessage(response: Response, fallbackMessage: string) {
