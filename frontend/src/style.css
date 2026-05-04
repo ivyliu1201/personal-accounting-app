@@ -1838,6 +1838,7 @@ td[colspan] {
 @media (max-width: 640px) {
   .app-shell {
     padding-bottom: 18px;
+    overflow-x: hidden;
   }
 
   .top-bar {
@@ -1852,9 +1853,22 @@ td[colspan] {
   }
 
   .nav-links {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
     width: 100%;
+  }
+
+  .nav-links button {
+    width: 100%;
+  }
+
+  .user-pill {
+    min-width: 0;
+  }
+
+  .nav-links button:last-child:nth-child(3) {
+    grid-column: 1 / -1;
   }
 
   .nav-links button,
@@ -1865,7 +1879,15 @@ td[colspan] {
   .workspace,
   .history-workspace {
     gap: 14px;
-    padding: 14px;
+    width: 100%;
+    padding: 12px;
+  }
+
+  input[type="date"] {
+    max-width: 100%;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   .entry-panel,
@@ -1919,13 +1941,27 @@ td[colspan] {
   .history-controls input,
   .history-controls select,
   .modal-actions button {
+    min-width: 0;
     width: 100%;
   }
 
   .entry-card {
-    grid-template-columns: minmax(84px, 0.76fr) minmax(124px, 0.92fr) minmax(62px, 0.42fr) minmax(76px, 0.44fr) minmax(0, 3.5fr) 36px;
-    grid-template-areas: "type date amount category note remove";
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "type amount"
+      "date date"
+      "category category"
+      "note note"
+      "remove remove";
     gap: 8px;
+  }
+
+  .entry-card > :nth-child(2) {
+    width: 100%;
+  }
+
+  .entry-card > :nth-child(5) {
+    min-height: 42px;
   }
 
   .icon-button {
@@ -1935,19 +1971,158 @@ td[colspan] {
   .history-panel,
   .details-panel,
   .history-trend-panel {
-    overflow-x: auto;
+    overflow-x: hidden;
   }
 
   table {
-    min-width: 620px;
+    display: block;
+    min-width: 0;
+    border-spacing: 0;
   }
 
-  .summary-table {
-    min-width: 420px;
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  tbody tr {
+    display: grid;
+    gap: 0;
+    border: 1.5px solid var(--line);
+    border-radius: 22px 18px 23px 17px;
+    overflow: hidden;
+    background:
+      linear-gradient(135deg, rgb(255 253 247 / 0.94), rgb(234 247 255 / 0.5));
+    box-shadow: var(--inset-light), 0 4px 10px rgb(44 95 117 / 0.06);
+  }
+
+  th,
+  td,
+  .details-panel th,
+  .details-panel td {
+    width: auto;
+    min-width: 0;
+    padding: 9px 12px;
+    white-space: normal;
   }
 
   .details-panel table {
-    min-width: 640px;
+    table-layout: auto;
+  }
+
+  .details-panel th:nth-child(n),
+  .details-panel td:nth-child(n) {
+    width: auto;
+    min-width: 0;
+  }
+
+  .details-panel tbody tr td:first-child,
+  .details-panel tbody tr td:last-child {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  td::before {
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+  }
+
+  tbody tr td:first-child,
+  tbody tr td:last-child,
+  tbody tr td {
+    border: 0;
+    border-bottom: 1.5px solid var(--line);
+    border-radius: 0;
+  }
+
+  tbody tr td:last-child {
+    border-bottom: 0;
+  }
+
+  td[colspan] {
+    display: block;
+    border: 1.5px dashed var(--line);
+    border-radius: var(--r-input);
+  }
+
+  td[colspan]::before {
+    content: none;
+  }
+
+  table:not(.summary-table) td:nth-child(1)::before {
+    content: "日期";
+  }
+
+  table:not(.summary-table) td:nth-child(2)::before {
+    content: "類型";
+  }
+
+  table:not(.summary-table) td:nth-child(3)::before {
+    content: "類別";
+  }
+
+  table:not(.summary-table) td:nth-child(4)::before {
+    content: "金額";
+  }
+
+  table:not(.summary-table) td:nth-child(5)::before {
+    content: "備註";
+  }
+
+  table:not(.summary-table) td:nth-child(6)::before {
+    content: "建立時間";
+  }
+
+  table:not(.summary-table) td:nth-child(7)::before {
+    content: "操作";
+  }
+
+  .summary-table {
+    min-width: 0;
+  }
+
+  .summary-table td:nth-child(1)::before {
+    content: "項目";
+  }
+
+  .summary-table td:nth-child(2)::before {
+    content: "金額";
+  }
+
+  .summary-table td:nth-child(3)::before {
+    content: "比例";
+  }
+
+  .truncate,
+  .details-panel .truncate {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .row-actions {
+    flex-wrap: wrap;
+  }
+
+  .trend-chart svg {
+    min-height: 210px;
   }
 
   .pager {

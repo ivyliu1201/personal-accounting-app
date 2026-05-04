@@ -1453,9 +1453,15 @@ function calculatePercentage(amount: number, total: number) {
 function getTrendRange(values: number[]) {
   const rawMin = Math.min(...values, 0);
   const rawMax = Math.max(...values, 0);
-  const min = Math.min(0, Math.floor(rawMin / TREND_TICK_STEP) * TREND_TICK_STEP);
+  let min = Math.min(0, Math.floor(rawMin / TREND_TICK_STEP) * TREND_TICK_STEP);
   let max = Math.max(0, Math.ceil(rawMax / TREND_TICK_STEP) * TREND_TICK_STEP);
 
+  if (rawMax <= 0) {
+    max = TREND_TICK_STEP;
+  }
+  if (rawMin >= 0) {
+    min = -TREND_TICK_STEP;
+  }
   if (max === min) {
     max = TREND_TICK_STEP;
   }
