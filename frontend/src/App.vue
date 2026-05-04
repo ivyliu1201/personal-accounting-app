@@ -128,13 +128,13 @@
             <h2>{{ summaryChartTitle }}</h2>
             <div class="segmented">
               <button type="button" :class="{ active: summaryMode === 'EXPENSE' }" @click="setSummaryMode('EXPENSE')">
-                {{ summaryModeButtonLabel('EXPENSE', summaryPeriodLabel) }}
+                {{ summaryModeLabel('EXPENSE') }}
               </button>
               <button type="button" :class="{ active: summaryMode === 'INCOME' }" @click="setSummaryMode('INCOME')">
-                {{ summaryModeButtonLabel('INCOME', summaryPeriodLabel) }}
+                {{ summaryModeLabel('INCOME') }}
               </button>
               <button type="button" :class="{ active: summaryMode === 'CASH_FLOW' }" @click="setSummaryMode('CASH_FLOW')">
-                {{ summaryModeButtonLabel('CASH_FLOW', summaryPeriodLabel) }}
+                {{ summaryModeLabel('CASH_FLOW') }}
               </button>
             </div>
           </div>
@@ -1545,10 +1545,6 @@ function summaryModeLabel(mode: SummaryMode) {
     return '總收入';
   }
   return '總現金流';
-}
-
-function summaryModeButtonLabel(mode: SummaryMode, periodLabel: string) {
-  return `${periodLabel}${summaryModeLabel(mode)}`;
 }
 
 function formatRangeLabel(startDate: string, endDate: string) {

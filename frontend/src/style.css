@@ -762,10 +762,20 @@ h1::after,
   flex-wrap: nowrap;
 }
 
+.summary-panel > .chart-panel > .panel-header {
+  flex-wrap: nowrap;
+}
+
 .chart-header h2 {
   flex: 1 1 auto;
   font-size: 18px;
   line-height: 1.2;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.summary-panel > .chart-panel > .panel-header h2 {
+  flex: 1 1 auto;
   white-space: normal;
   word-break: keep-all;
 }
@@ -775,7 +785,16 @@ h1::after,
   flex-wrap: nowrap;
 }
 
+.summary-panel > .chart-panel > .panel-header .segmented {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
 .chart-header .segmented button {
+  padding: 6px 10px;
+}
+
+.summary-panel > .chart-panel > .panel-header .segmented button {
   padding: 6px 10px;
 }
 
@@ -1189,9 +1208,11 @@ td[colspan] {
 }
 
 .donut-legend span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.35;
 }
 
 /* ----- trend chart ----- */
