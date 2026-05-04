@@ -37,7 +37,7 @@ class RequestCurrentUserProviderTests {
     }
 
     @Test
-    void getCurrentUserIdReturnsFirebaseUidWhenEmailIsAllowed() {
+    void getCurrentUserIdReturnsDevUserWhenEmailIsAllowed() {
         FirebaseTokenVerifier verifier = token -> new AuthenticatedUser("firebase-user-id", "FannyLiu1201@gmail.com");
         RequestCurrentUserProvider provider = new RequestCurrentUserProvider(
                 verifierProvider(verifier),
@@ -47,7 +47,7 @@ class RequestCurrentUserProviderTests {
         );
         bindAuthorizationHeader("Bearer valid-token");
 
-        assertThat(provider.getCurrentUserId()).isEqualTo("firebase-user-id");
+        assertThat(provider.getCurrentUserId()).isEqualTo("dev-user");
     }
 
     @Test

@@ -52,7 +52,7 @@ public class RequestCurrentUserProvider implements CurrentUserProvider {
         if (authorizationHeader != null && authorizationHeader.startsWith(BEARER_PREFIX)) {
             AuthenticatedUser user = verifyFirebaseUser(authorizationHeader.substring(BEARER_PREFIX.length()).trim());
             validateAllowedEmail(user.email());
-            return user.userId();
+            return devUserId;
         }
 
         if (devFallbackEnabled) {

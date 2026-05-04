@@ -20,6 +20,8 @@ services:
     build:
       context: ./backend
     container_name: personal-accounting-backend
+    volumes:
+      - C:/ivy/code/secrets/personal-accounting-firebase-admin.json.json:/run/secrets/personal-accounting-firebase-admin.json:ro
     environment:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/personal_accounting}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-personal_accounting}
@@ -27,9 +29,9 @@ services:
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:-false}
       APP_DEV_USER_ID: ${APP_DEV_USER_ID:-dev-user}
       APP_AUTH_DEV_FALLBACK_ENABLED: ${APP_AUTH_DEV_FALLBACK_ENABLED:-true}
-      APP_FIREBASE_ENABLED: ${APP_FIREBASE_ENABLED:-false}
+      APP_FIREBASE_ENABLED: ${APP_FIREBASE_ENABLED:-true}
       APP_ALLOWED_USER_EMAILS: ${APP_ALLOWED_USER_EMAILS:-}
-      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/run/secrets/personal-accounting-firebase-admin.json}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
