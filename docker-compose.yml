@@ -21,9 +21,10 @@ services:
       context: ./backend
     container_name: personal-accounting-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-personal_accounting}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-personal_accounting}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/personal_accounting}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-personal_accounting}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-change_me}
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:-false}
       APP_DEV_USER_ID: ${APP_DEV_USER_ID:-dev-user}
       APP_AUTH_DEV_FALLBACK_ENABLED: ${APP_AUTH_DEV_FALLBACK_ENABLED:-true}
       APP_FIREBASE_ENABLED: ${APP_FIREBASE_ENABLED:-false}
