@@ -4,93 +4,15 @@
 
 ## 目前建議測試方式
 
-目前建議用本機 Worker + 本機前端測試最新功能。
+目前建議用本機 Spring Boot（連 Supabase Postgres）+ 本機前端測試。
 
 最快方式：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local-worker-app.ps1
-```
-
-啟動後開啟：
-
-```text
-http://localhost:5173
-```
-
-這個 script 會：
-
-- 讀取 `.env`。
-- 確認 `worker/.dev.vars` 存在；若不存在，會用 `.env` 的 `VITE_FIREBASE_PROJECT_ID` 建立本機檔案。
-- 套用 Wrangler local D1 migration。
-- 啟動 Worker `http://localhost:8787`。
-- 啟動前端 `http://localhost:5173`，並讓前端 API 指向 Worker。
-- 執行 Worker local smoke check。
-- 前端 Vite 會從 repo root 的 `.env` 讀取 `VITE_FIREBASE_*` 與 `VITE_API_PROXY_TARGET`。
-
-手動方式如下。
-
-先啟動 Worker：
-
-```powershell
-cd worker
-npm run d1:migrate:local
-npm run dev:local
+powershell -ExecutionPolicy Bypass -File .\scripts\start-local-backend-app.ps1
 ```
 
 再開另一個終端機啟動前端：
-
-```powershell
-cd frontend
-$env:VITE_API_PROXY_TARGET='http://localhost:8787'
-npm run dev -- --host localhost
-```
-
-開啟：
-
-```text
-http://localhost:5173
-```
-
-注意：
-
-- Firebase 登入本機測試請使用 `localhost`，不要使用 `127.0.0.1`。
-- `frontend` 的 Vite 設定會從 repo root 的 `.env` 讀取 Firebase Web 設定，所以前端相關環境變數請維持在專案根目錄。
-- Worker 交易 API 需要 Firebase ID token；未登入時 protected API 回 `401` 是預期行為。
-- 本機 Worker 使用 Wrangler local D1，不會部署到 Cloudflare，也不會產生雲端費用。
-
-## 本機 Smoke Check
-
-Worker 啟動後，可以在另一個終端機執行：
-
-```powershell
-cd worker
-npm run smoke:local
-```
-
-目前 smoke check 會確認：
-
-- `GET /api/health` 回 `200`
-- 未登入呼叫 protected API 回 `401`
-
-## Spring Boot 回退模式
-
-Spring Boot + PostgreSQL 目前保留作為回退路徑。
-
-本機開發時可只用 Docker 啟動 PostgreSQL：
-
-```powershell
-docker compose up -d postgres
-```
-
-啟動後端：
-
-```powershell
-cd backend
-.\mvnw.cmd spring-boot:run
-```
-
-啟動前端並指向 Spring Boot：
 
 ```powershell
 cd frontend
@@ -104,9 +26,15 @@ npm run dev -- --host localhost
 http://localhost:5173
 ```
 
+注意：
+
+- Firebase 登入本機測試請使用 `localhost`，不要使用 `127.0.0.1`。
+- `frontend` 的 Vite 設定會從 repo root 的 `.env` 讀取 Firebase Web 設定，所以前端相關環境變數請維持在專案根目錄。
+- 後端保護 API 需要 Firebase ID token；未登入時回 `401` 是預期行為。
+
 ## Docker 啟動
 
-Docker Compose 目前仍是 Spring Boot + PostgreSQL 路徑。
+Docker Compose 目前仍是 Spring Boot 路徑；資料庫可用容器 PostgreSQL 或 Supabase Postgres。
 
 啟動整套服務：
 
@@ -165,9 +93,7 @@ npm run test:date-format
 Worker 測試：
 
 ```powershell
-cd worker
-npm run typecheck
-npm test
+不使用（已停用，見 worker/README.md）
 ```
 
 後端測試：
@@ -215,13 +141,54 @@ VITE_API_PROXY_TARGET=http://localhost:8080
 
 - 前端 Firebase Web 設定使用 `VITE_FIREBASE_*`，會在前端 build 時注入。
 - `frontend/vite.config.ts` 會從 repo root `.env` 讀取前端環境變數，所以本機開發時請把 `VITE_FIREBASE_*` 和 `VITE_API_PROXY_TARGET` 放在專案根目錄 `.env`。
-- `VITE_API_PROXY_TARGET=http://localhost:8787` 可讓 Vite dev server 指向本機 Worker。
 - `VITE_API_PROXY_TARGET=http://localhost:8080` 可讓 Vite dev server 指向 Spring Boot。
-- 若設定 `VITE_API_BASE_URL`，前端會直接把 `/api/...` 請求送到該 base URL；跨網域使用 Worker 時需先完成 Worker CORS 設定。
+- 若設定 `VITE_API_BASE_URL`，前端會直接把 `/api/...` 請求送到該 base URL；跨網域時需先完成後端 CORS 設定。
+- `APP_CORS_ALLOWED_ORIGINS` 用逗號分隔可允許的前端網域（例如 `http://localhost:5173,https://your-pages.pages.dev`）。
 
-## 付費與雲端操作限制
+Supabase 連線請設定：
 
-- 目前本機 Worker + local D1 不需要付費。
-- 不要直接執行 Cloudflare deploy 或建立遠端 D1，除非已確認 Cloudflare 帳號、額度與付款需求。
-- 任何需要 Cloudflare Workers Paid、D1 付費額度、綁定信用卡或其他付費功能的操作，都必須先取得使用者確認。
+```text
+SPRING_DATASOURCE_URL=jdbc:postgresql://<supabase-host>:5432/postgres?sslmode=require
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=<your-supabase-db-password>
+```
+
+## Cloudflare 佈署前提醒
+
+- 目前資料庫路徑為 Supabase Postgres，非 D1。
+- 部署到 Cloudflare 前，請先確認後端實際部署位置與 CORS allowed origins。
+
+## Cloudflare Worker 後端（Supabase）
+
+Worker 需要這三個 secret：
+
+- `FIREBASE_PROJECT_ID`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+部署指令：
+
+```powershell
+cd worker
+wrangler secret put FIREBASE_PROJECT_ID
+wrangler secret put SUPABASE_URL
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npm run deploy
+```
+
+## Cloudflare 線上部署（前端）
+
+1. 設定後端正式 URL（可連 Supabase）。
+2. 在後端環境設定：
+   - `APP_CORS_ALLOWED_ORIGINS=https://<your-pages-domain>`
+3. 前端 build 前設定：
+   - `VITE_API_BASE_URL=https://<your-backend-domain>`
+4. 建置前端：
+
+```powershell
+cd frontend
+npm run build
+```
+
+5. 部署 `frontend/dist` 到 Cloudflare Pages（或你既有的 Cloudflare 靜態站流程）。
 

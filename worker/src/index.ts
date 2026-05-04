@@ -1,5 +1,6 @@
 import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
 import { listCategoryOptions, parseTransactionType } from './categories';
+import { getSupabaseClient } from './db';
 import {
   createBatchTransactions,
   deleteTransaction,
@@ -43,94 +44,96 @@ export default {
    */
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const url = new URL(request.url);
+    const corsOrigin = resolveCorsOrigin(request, env);
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: buildCorsHeaders(corsOrigin)
+      });
+    }
+    let supabase;
+    try {
+      supabase = getSupabaseClient(env);
+    } catch {
+      return jsonResponse<ErrorResponse>({ message: 'Supabase is not configured' }, 500);
+    }
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return jsonResponse<HealthResponse>({
         status: 'ok',
         service: 'personal-accounting-worker'
-      });
+      }, 200, corsOrigin);
     }
 
     if (request.method === 'GET' && url.pathname === '/api/auth/me') {
       try {
         const user = await authenticateFirebaseRequest(request, env);
-        return jsonResponse(user);
+        return jsonResponse(user, 200, corsOrigin);
       } catch (error) {
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Authentication failed' }, 401);
+        return jsonResponse<ErrorResponse>({ message: 'Authentication failed' }, 401, corsOrigin);
       }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/transactions/categories') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const type = parseTransactionType(url.searchParams);
         const user = await authenticateFirebaseRequest(request, env);
-        const categories = await listCategoryOptions(env.ACCOUNTING_DB, user, type);
-        return jsonResponse(categories);
+        const categories = await listCategoryOptions(supabase, user, type);
+        return jsonResponse(categories, 200, corsOrigin);
       } catch (error) {
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Categories loading failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'Categories loading failed' }, 500, corsOrigin);
       }
     }
 
     if (request.method === 'POST' && url.pathname === '/api/transactions/batch') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const user = await authenticateFirebaseRequest(request, env);
         const body = await request.json();
-        const response = await createBatchTransactions(env.ACCOUNTING_DB, user, body);
-        return jsonResponse(response);
+        const response = await createBatchTransactions(supabase, user, body);
+        return jsonResponse(response, 200, corsOrigin);
       } catch (error) {
         if (error instanceof SyntaxError) {
-          return jsonResponse<ErrorResponse>({ message: 'Request body is invalid' }, 400);
+          return jsonResponse<ErrorResponse>({ message: 'Request body is invalid' }, 400, corsOrigin);
         }
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Batch create failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'Batch create failed' }, 500, corsOrigin);
       }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/transactions/recent') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const limit = parseRecentLimit(url.searchParams);
         const user = await authenticateFirebaseRequest(request, env);
-        const transactions = await listRecentTransactions(env.ACCOUNTING_DB, user, limit);
-        return jsonResponse(transactions);
+        const transactions = await listRecentTransactions(supabase, user, limit);
+        return jsonResponse(transactions, 200, corsOrigin);
       } catch (error) {
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Recent transactions loading failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'Recent transactions loading failed' }, 500, corsOrigin);
       }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/transactions/history') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const type = parseTransactionType(url.searchParams);
         const startDate = parseRequiredDate(url.searchParams, 'startDate');
         const endDate = parseRequiredDate(url.searchParams, 'endDate');
@@ -138,7 +141,7 @@ export default {
         const size = parseHistorySize(url.searchParams);
         const user = await authenticateFirebaseRequest(request, env);
         const transactions = await listHistoryTransactions(
-          env.ACCOUNTING_DB,
+          supabase,
           user,
           type,
           startDate,
@@ -146,23 +149,20 @@ export default {
           page,
           size
         );
-        return jsonResponse(transactions);
+        return jsonResponse(transactions, 200, corsOrigin);
       } catch (error) {
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'History transactions loading failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'History transactions loading failed' }, 500, corsOrigin);
       }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/transactions/category-summary') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const type = parseTransactionType(url.searchParams);
         const dateRange = resolveSummaryDateRange(
           parseOptionalDate(url.searchParams, 'startDate'),
@@ -170,109 +170,97 @@ export default {
         );
         const user = await authenticateFirebaseRequest(request, env);
         const summaries = await listCategorySummaries(
-          env.ACCOUNTING_DB,
+          supabase,
           user,
           type,
           dateRange.startDate,
           dateRange.endDate
         );
-        return jsonResponse(summaries);
+        return jsonResponse(summaries, 200, corsOrigin);
       } catch (error) {
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Category summary loading failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'Category summary loading failed' }, 500, corsOrigin);
       }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/transactions/history-trend') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const type = parseTransactionType(url.searchParams);
         const startDate = parseRequiredDate(url.searchParams, 'startDate');
         const endDate = parseRequiredDate(url.searchParams, 'endDate');
         const user = await authenticateFirebaseRequest(request, env);
-        const trend = await listHistoryTrend(env.ACCOUNTING_DB, user, type, startDate, endDate);
-        return jsonResponse(trend);
+        const trend = await listHistoryTrend(supabase, user, type, startDate, endDate);
+        return jsonResponse(trend, 200, corsOrigin);
       } catch (error) {
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'History trend loading failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'History trend loading failed' }, 500, corsOrigin);
       }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/transactions/cash-flow-trend') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const year = parseTrendYear(url.searchParams);
         const user = await authenticateFirebaseRequest(request, env);
-        const trend = await listAnnualCashFlowTrend(env.ACCOUNTING_DB, user, year);
-        return jsonResponse(trend);
+        const trend = await listAnnualCashFlowTrend(supabase, user, year);
+        return jsonResponse(trend, 200, corsOrigin);
       } catch (error) {
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Cash flow trend loading failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'Cash flow trend loading failed' }, 500, corsOrigin);
       }
     }
 
     const transactionPathMatch = url.pathname.match(/^\/api\/transactions\/([^/]+)$/);
     if (transactionPathMatch && request.method === 'PUT') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const user = await authenticateFirebaseRequest(request, env);
         const body = await request.json();
-        const transaction = await updateTransaction(env.ACCOUNTING_DB, user, transactionPathMatch[1], body);
-        return jsonResponse(transaction);
+        const transaction = await updateTransaction(supabase, user, transactionPathMatch[1], body);
+        return jsonResponse(transaction, 200, corsOrigin);
       } catch (error) {
         if (error instanceof SyntaxError) {
-          return jsonResponse<ErrorResponse>({ message: 'Request body is invalid' }, 400);
+          return jsonResponse<ErrorResponse>({ message: 'Request body is invalid' }, 400, corsOrigin);
         }
         if (error instanceof RangeError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 400);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
         }
         if (error instanceof TransactionNotFoundError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 404);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 404, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Transaction update failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'Transaction update failed' }, 500, corsOrigin);
       }
     }
 
     if (transactionPathMatch && request.method === 'DELETE') {
       try {
-        if (!env.ACCOUNTING_DB) {
-          return jsonResponse<ErrorResponse>({ message: 'Accounting database is not configured' }, 500);
-        }
         const user = await authenticateFirebaseRequest(request, env);
-        await deleteTransaction(env.ACCOUNTING_DB, user, transactionPathMatch[1]);
-        return jsonResponse<Record<string, never>>({});
+        await deleteTransaction(supabase, user, transactionPathMatch[1]);
+        return jsonResponse<Record<string, never>>({}, 200, corsOrigin);
       } catch (error) {
         if (error instanceof TransactionNotFoundError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, 404);
+          return jsonResponse<ErrorResponse>({ message: error.message }, 404, corsOrigin);
         }
         if (error instanceof AuthError) {
-          return jsonResponse<ErrorResponse>({ message: error.message }, error.status);
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
-        return jsonResponse<ErrorResponse>({ message: 'Transaction delete failed' }, 500);
+        return jsonResponse<ErrorResponse>({ message: 'Transaction delete failed' }, 500, corsOrigin);
       }
     }
 
@@ -280,7 +268,8 @@ export default {
       {
         message: 'Not found'
       },
-      404
+      404,
+      corsOrigin
     );
   }
 };
@@ -292,9 +281,38 @@ export default {
  * 輸出：帶有 JSON header 的 Response。
  * 可能錯誤：body 無法序列化時會拋出 JSON.stringify 錯誤。
  */
-function jsonResponse<TBody>(body: TBody, status = 200): Response {
+function jsonResponse<TBody>(body: TBody, status = 200, corsOrigin?: string): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: JSON_HEADERS
+    headers: {
+      ...JSON_HEADERS,
+      ...buildCorsHeaders(corsOrigin)
+    }
   });
+}
+
+function resolveCorsOrigin(request: Request, env: WorkerEnv): string | undefined {
+  const requestOrigin = request.headers.get('Origin');
+  if (!requestOrigin) {
+    return undefined;
+  }
+  const allowedOriginsRaw = env.APP_CORS_ALLOWED_ORIGINS?.trim();
+  if (!allowedOriginsRaw) {
+    return undefined;
+  }
+  const allowedOrigins = allowedOriginsRaw.split(',').map((item) => item.trim()).filter(Boolean);
+  return allowedOrigins.includes(requestOrigin) ? requestOrigin : undefined;
+}
+
+function buildCorsHeaders(origin?: string): Record<string, string> {
+  if (!origin) {
+    return {};
+  }
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization,Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+    'Vary': 'Origin'
+  };
 }

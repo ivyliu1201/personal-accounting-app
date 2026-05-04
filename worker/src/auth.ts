@@ -3,7 +3,9 @@ import type { JWTPayload } from 'jose';
 
 export interface WorkerEnv {
   FIREBASE_PROJECT_ID?: string;
-  ACCOUNTING_DB?: D1Database;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  APP_CORS_ALLOWED_ORIGINS?: string;
 }
 
 export interface AuthenticatedUser {

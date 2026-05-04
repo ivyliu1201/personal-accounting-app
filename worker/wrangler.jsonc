@@ -1,14 +1,9 @@
 {
+  // Deprecated: Worker + D1 route is no longer the active project path.
+  // Keep this file only for historical reference. Do not deploy from this config.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "personal-accounting-worker",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-02",
-  "workers_dev": true,
-  "d1_databases": [
-    {
-      "binding": "ACCOUNTING_DB",
-      "database_name": "personal-accounting-poc",
-      "database_id": "TODO_CREATE_D1_DATABASE_BEFORE_DEPLOY"
-    }
-  ]
+  "workers_dev": true
 }
