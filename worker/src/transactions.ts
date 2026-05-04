@@ -511,20 +511,32 @@ async function getOrCreateCategoryId(
   categoryName: string,
   createdAt: string
 ): Promise<string> {
-  const { data: existingCategory, error: categoryQueryError } = await supabase
+  const { data: userCategory, error: userCategoryError } = await supabase
     .from('categories')
-    .select('id,default_category')
+    .select('id')
     .eq('type', type)
     .eq('name', categoryName)
-    .or(`user_id.eq.${user.userId},user_id.is.null`)
-    .order('default_category', { ascending: false })
-    .limit(1)
+    .eq('user_id', user.userId)
     .maybeSingle();
-  if (categoryQueryError) {
-    throw categoryQueryError;
+  if (userCategoryError) {
+    throw userCategoryError;
   }
-  if (existingCategory?.id) {
-    return existingCategory.id as string;
+  if (userCategory?.id) {
+    return userCategory.id as string;
+  }
+
+  const { data: defaultCategory, error: defaultCategoryError } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('type', type)
+    .eq('name', categoryName)
+    .is('user_id', null)
+    .maybeSingle();
+  if (defaultCategoryError) {
+    throw defaultCategoryError;
+  }
+  if (defaultCategory?.id) {
+    return defaultCategory.id as string;
   }
 
   const categoryId = crypto.randomUUID();

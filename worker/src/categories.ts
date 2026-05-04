@@ -20,16 +20,27 @@ export async function listCategoryOptions(
   user: AuthenticatedUser,
   type: TransactionType
 ): Promise<CategoryOptionResponse[]> {
-  const { data, error } = await supabase
+  const { data: defaultCategories, error: defaultCategoryError } = await supabase
     .from('categories')
     .select('name,user_id')
     .eq('type', type)
-    .or(`user_id.eq.${user.userId},user_id.is.null`)
+    .is('user_id', null)
     .order('name', { ascending: true });
 
-  if (error) {
-    throw error;
+  if (defaultCategoryError) {
+    throw defaultCategoryError;
   }
-  const uniqueNames = [...new Set((data ?? []).map((row) => row.name as string))];
+
+  const { data: userCategories, error: userCategoryError } = await supabase
+    .from('categories')
+    .select('name,user_id')
+    .eq('type', type)
+    .eq('user_id', user.userId)
+    .order('name', { ascending: true });
+
+  if (userCategoryError) {
+    throw userCategoryError;
+  }
+  const uniqueNames = [...new Set([...(defaultCategories ?? []), ...(userCategories ?? [])].map((row) => row.name as string))];
   return uniqueNames.map((name) => ({ name }));
 }
