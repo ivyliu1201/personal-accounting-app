@@ -1,6 +1,7 @@
 package com.ivy.accounting.transaction;
 
 import com.ivy.accounting.auth.CurrentUserProvider;
+import com.ivy.accounting.auth.DatabaseUserScope;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
@@ -30,17 +31,20 @@ public class TransactionService {
     private static final BigDecimal PERCENTAGE_MULTIPLIER = BigDecimal.valueOf(100);
 
     private final CurrentUserProvider currentUserProvider;
+    private final DatabaseUserScope databaseUserScope;
     private final CategoryRepository categoryRepository;
     private final AccountingTransactionRepository transactionRepository;
     private final Clock clock;
 
     public TransactionService(
             CurrentUserProvider currentUserProvider,
+            DatabaseUserScope databaseUserScope,
             CategoryRepository categoryRepository,
             AccountingTransactionRepository transactionRepository,
             Clock clock
     ) {
         this.currentUserProvider = currentUserProvider;
+        this.databaseUserScope = databaseUserScope;
         this.categoryRepository = categoryRepository;
         this.transactionRepository = transactionRepository;
         this.clock = clock;
@@ -48,7 +52,7 @@ public class TransactionService {
 
     @Transactional
     public List<AccountingTransaction> createBatch(BatchCreateTransactionsRequest request) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         OffsetDateTime now = OffsetDateTime.now(clock);
         List<AccountingTransaction> createdTransactions = new ArrayList<>();
 
@@ -63,14 +67,14 @@ public class TransactionService {
 
     @Transactional(readOnly = true)
     public List<AccountingTransaction> listRecent(Integer requestedLimit) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         int limit = normalizeRecentLimit(requestedLimit);
         return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
     }
 
     @Transactional
     public AccountingTransaction updateTransaction(UUID id, UpdateTransactionRequest request) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         AccountingTransaction transaction = getRequiredTransaction(id, userId);
         Category category = getOrCreateCategory(
                 userId,
@@ -89,7 +93,7 @@ public class TransactionService {
 
     @Transactional
     public void deleteTransaction(UUID id) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         AccountingTransaction transaction = getRequiredTransaction(id, userId);
         transactionRepository.delete(transaction);
     }
@@ -102,7 +106,7 @@ public class TransactionService {
             Integer requestedPage,
             Integer requestedSize
     ) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         int page = normalizePage(requestedPage);
         int size = normalizeHistorySize(requestedSize);
         Slice<AccountingTransaction> transactions = transactionRepository
@@ -127,7 +131,7 @@ public class TransactionService {
             LocalDate requestedStartDate,
             LocalDate requestedEndDate
     ) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         LocalDate endDate = requestedEndDate == null ? LocalDate.now(clock) : requestedEndDate;
         LocalDate startDate = requestedStartDate == null ? YearMonth.from(endDate).atDay(1) : requestedStartDate;
         List<CategorySummaryProjection> summaries = transactionRepository.listCategorySummaries(
@@ -151,7 +155,7 @@ public class TransactionService {
 
     @Transactional(readOnly = true)
     public List<CategoryOptionResponse> listCategoryOptions(TransactionType type) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         return categoryRepository.listVisibleCategoryNames(userId, type)
                 .stream()
                 .map(CategoryOptionResponse::new)
@@ -164,7 +168,7 @@ public class TransactionService {
             LocalDate startDate,
             LocalDate endDate
     ) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         List<HistoryTrendPointProjection> trendPoints = isSameMonth(startDate, endDate)
                 ? transactionRepository.listDailyHistoryTrend(userId, type, startDate, endDate)
                 : transactionRepository.listMonthlyHistoryTrend(userId, type, startDate, endDate);
@@ -185,7 +189,7 @@ public class TransactionService {
 
     @Transactional(readOnly = true)
     public List<HistoryTrendPointResponse> listAnnualCashFlowTrend(Integer requestedYear) {
-        String userId = currentUserProvider.getCurrentUserId();
+        String userId = getCurrentUserId();
         LocalDate today = LocalDate.now(clock);
         int year = requestedYear == null ? today.getYear() : requestedYear;
         int endMonth = getAnnualTrendEndMonth(year, today);
@@ -329,5 +333,18 @@ public class TransactionService {
         }
         return amount.multiply(PERCENTAGE_MULTIPLIER)
                 .divide(totalAmount, 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 取得目前使用者 ID，並同步寫入資料庫 session 變數供 RLS 使用。
+     *
+     * 輸入：無。
+     * 輸出：目前登入使用者 ID。
+     * 可能錯誤：未登入或資料庫連線失敗時，往上拋出既有驗證或資料存取例外。
+     */
+    private String getCurrentUserId() {
+        String userId = currentUserProvider.getCurrentUserId();
+        databaseUserScope.activate(userId);
+        return userId;
     }
 }

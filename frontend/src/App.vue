@@ -37,13 +37,6 @@
           </svg>
           Google 登入
         </button>
-        <button v-if="!currentUser" type="button" @click="signInWithDemoUser">
-          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M8 19c1.2-1.8 2.6-2.7 4-2.7s2.8.9 4 2.7" />
-            <path d="M12 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
-          </svg>
-          假帳號登入（載入假資料）
-        </button>
       </div>
     </nav>
 
@@ -450,10 +443,6 @@ import watercolorMascotPinkUrl from './assets/watercolor-mascot-pink.png';
 
 type TransactionType = 'INCOME' | 'EXPENSE';
 type SummaryMode = TransactionType | 'CASH_FLOW';
-type AppUser = User | {
-  displayName: string;
-  email: string;
-};
 
 interface EntryRow {
   id: number;
@@ -605,10 +594,7 @@ const deletingTransaction = ref<TransactionResponse | null>(null);
 const editForm = ref<EditForm>(createEditForm());
 const isSavingEdit = ref(false);
 const isDeleting = ref(false);
-const currentUser = ref<AppUser | null>(null);
-const demoMode = ref(false);
-const demoTransactions = ref<TransactionResponse[]>([]);
-let demoTransactionId = 1;
+const currentUser = ref<User | null>(null);
 
 const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
@@ -808,9 +794,6 @@ const DonutBlock = defineComponent({
 onMounted(() => {
   if (firebaseAuth) {
     onAuthStateChanged(firebaseAuth, (user) => {
-      if (demoMode.value) {
-        return;
-      }
       currentUser.value = user;
       if (user) {
         void refreshAfterMutation();
@@ -927,14 +910,6 @@ async function submitBatch() {
 
   isSubmitting.value = true;
   try {
-    if (demoMode.value) {
-      addDemoTransactions();
-      rows.value = [createRow()];
-      await refreshAfterMutation();
-      showMessage('新增完成（假帳號）');
-      return;
-    }
-
     const response = await apiFetch('/api/transactions/batch', {
       method: 'POST',
       headers: {
@@ -1011,15 +986,6 @@ async function submitEdit() {
 
   isSavingEdit.value = true;
   try {
-    if (demoMode.value) {
-      updateDemoTransaction(editingTransaction.value.id);
-      editingTransaction.value = null;
-      editForm.value = createEditForm();
-      await refreshAfterMutation();
-      showMessage('更新完成（假帳號）');
-      return;
-    }
-
     const response = await apiFetch(`/api/transactions/${editingTransaction.value.id}`, {
       method: 'PUT',
       headers: {
@@ -1071,17 +1037,6 @@ async function confirmDelete() {
 
   isDeleting.value = true;
   try {
-    if (demoMode.value) {
-      deleteDemoTransaction(deletingTransaction.value.id);
-      deletingTransaction.value = null;
-      if (deletedFromHistoryLastRow) {
-        historyPage.value -= 1;
-      }
-      await refreshAfterMutation();
-      showMessage('刪除完成（假帳號）');
-      return;
-    }
-
     const response = await apiFetch(`/api/transactions/${deletingTransaction.value.id}`, {
       method: 'DELETE'
     });
@@ -1117,11 +1072,6 @@ function getEditCategoryName() {
 }
 
 async function refreshAfterMutation() {
-  if (demoMode.value) {
-    await refreshDemoData();
-    return;
-  }
-
   if (currentView.value === 'history') {
     await Promise.all([
       loadHistory(),
@@ -1159,19 +1109,10 @@ function showHistory() {
     return;
   }
   currentView.value = 'history';
-  if (demoMode.value) {
-    void refreshDemoData();
-    return;
-  }
   void loadHistoryView();
 }
 
 async function loadCategories(showError = true) {
-  if (demoMode.value) {
-    loadDemoCategories();
-    return true;
-  }
-
   try {
     const [expenseResponse, incomeResponse] = await Promise.all([
       apiFetch('/api/transactions/categories?type=EXPENSE'),
@@ -1199,11 +1140,6 @@ async function loadCategories(showError = true) {
 }
 
 async function loadRecent(showError = true) {
-  if (demoMode.value) {
-    loadDemoRecent();
-    return true;
-  }
-
   isLoadingRecent.value = true;
   try {
     const response = await apiFetch(`/api/transactions/recent?limit=${recentLimit.value}`);
@@ -1227,10 +1163,6 @@ async function resetHistoryPageAndLoad() {
   if (historySummaryMode.value !== 'CASH_FLOW') {
     historySummaryMode.value = historyType.value;
   }
-  if (demoMode.value) {
-    await refreshDemoData();
-    return;
-  }
   await loadHistoryView();
 }
 
@@ -1239,10 +1171,6 @@ async function previousHistoryPage() {
     return;
   }
   historyPage.value -= 1;
-  if (demoMode.value) {
-    loadDemoHistory();
-    return;
-  }
   await loadHistory();
 }
 
@@ -1251,27 +1179,14 @@ async function nextHistoryPage() {
     return;
   }
   historyPage.value += 1;
-  if (demoMode.value) {
-    loadDemoHistory();
-    return;
-  }
   await loadHistory();
 }
 
 async function loadHistoryView() {
-  if (demoMode.value) {
-    await refreshDemoData();
-    return;
-  }
   await Promise.all([loadHistory(), loadHistoryCategorySummary(), loadHistoryTrend()]);
 }
 
 async function loadHistory() {
-  if (demoMode.value) {
-    loadDemoHistory();
-    return true;
-  }
-
   if (historyStartDate.value > historyEndDate.value) {
     showMessage('開始日期不可晚於結束日期');
     return false;
@@ -1305,11 +1220,6 @@ async function loadHistory() {
 }
 
 async function loadCategorySummary(showError = true) {
-  if (demoMode.value) {
-    loadDemoHomeSummary();
-    return true;
-  }
-
   isLoadingSummary.value = true;
   try {
     const [expenseSummaries, incomeSummaries] = await Promise.all([
@@ -1330,11 +1240,6 @@ async function loadCategorySummary(showError = true) {
 }
 
 async function loadHistoryCategorySummary() {
-  if (demoMode.value) {
-    loadDemoHistorySummary();
-    return true;
-  }
-
   if (historyStartDate.value > historyEndDate.value) {
     historyExpenseCategorySummaries.value = [];
     historyIncomeCategorySummaries.value = [];
@@ -1359,11 +1264,6 @@ async function loadHistoryCategorySummary() {
 }
 
 async function loadHistoryTrend() {
-  if (demoMode.value) {
-    loadDemoHistoryTrend();
-    return true;
-  }
-
   isLoadingHistoryTrend.value = true;
   try {
     const params = new URLSearchParams({
@@ -1411,29 +1311,7 @@ async function signInWithGoogle() {
   }
 }
 
-function signInWithDemoUser() {
-  demoMode.value = true;
-  currentUser.value = {
-    displayName: '假帳號',
-    email: 'demo@example.com'
-  };
-  currentView.value = 'home';
-  resetProtectedData();
-  const seededCount = seedDemoTransactions();
-  void refreshDemoData();
-  showMessage(`已載入 ${seededCount} 筆假資料`);
-}
-
 async function signOutUser() {
-  if (demoMode.value) {
-    demoMode.value = false;
-    currentUser.value = null;
-    demoTransactions.value = [];
-    resetProtectedData();
-    showMessage('已登出');
-    return;
-  }
-
   if (!firebaseAuth) {
     return;
   }
@@ -1456,217 +1334,6 @@ function resetProtectedData() {
     EXPENSE: defaultExpenseCategories,
     INCOME: defaultIncomeCategories
   };
-}
-
-// TODO(中): 假帳號模式僅供本機前端展示，正式資料串接恢復後應移除或改成明確測試入口。
-function seedDemoTransactions() {
-  demoTransactionId = 1;
-  const currentMonthFirstDate = defaultMonthStartDate;
-  const currentMonthSecondDate = formatDemoMonthDate(2);
-  const currentMonthThirdDate = formatDemoMonthDate(3);
-  const yesterdayDate = formatRelativeDate(-1);
-  const previousMonthDate = formatMonthOffsetDate(-1, 18);
-  const twoMonthsAgoDate = formatMonthOffsetDate(-2, 12);
-
-  demoTransactions.value = [
-    createDemoTransaction('INCOME', currentMonthFirstDate, 58000, '薪資', '假資料：本月薪資', 1),
-    createDemoTransaction('EXPENSE', currentMonthFirstDate, 1200, '飲食', '假資料：早餐與晚餐', 2),
-    createDemoTransaction('EXPENSE', currentMonthSecondDate, 760, '交通', '假資料：通勤交通', 3),
-    createDemoTransaction('EXPENSE', currentMonthThirdDate, 1680, '繳費', '假資料：手機費', 4),
-    createDemoTransaction('EXPENSE', yesterdayDate, 900, '運動', '假資料：健身課', 5),
-    createDemoTransaction('EXPENSE', today, 320, '社交', '假資料：咖啡聚會', 6),
-    createDemoTransaction('INCOME', today, 2200, '投資', '假資料：股息收入', 7),
-    createDemoTransaction('EXPENSE', previousMonthDate, 2400, '自我成長', '假資料：線上課程', 8),
-    createDemoTransaction('EXPENSE', previousMonthDate, 1850, '治裝費', '假資料：衣物', 9),
-    createDemoTransaction('INCOME', twoMonthsAgoDate, 1600, '投資', '假資料：投資收入', 10),
-    createDemoTransaction('EXPENSE', twoMonthsAgoDate, 1100, '飲食', '假資料：聚餐', 11)
-  ];
-  return demoTransactions.value.length;
-}
-
-function createDemoTransaction(
-  type: TransactionType,
-  transactionDate: string,
-  amount: number,
-  categoryName: string,
-  note: string,
-  createdOffsetHours: number
-): TransactionResponse {
-  const createdAtDate = new Date(todayDate.getTime() - (createdOffsetHours * 60 * 60 * 1000));
-  return {
-    id: `demo-seed-${demoTransactionId++}`,
-    type,
-    transactionDate,
-    amount,
-    categoryName,
-    note,
-    createdAt: createdAtDate.toISOString()
-  };
-}
-
-function formatDemoMonthDate(day: number) {
-  const safeDay = Math.min(day, todayDate.getDate());
-  return formatDateInputValue(new Date(todayDate.getFullYear(), todayDate.getMonth(), safeDay));
-}
-
-function formatRelativeDate(offsetDays: number) {
-  const date = new Date(todayDate);
-  date.setDate(date.getDate() + offsetDays);
-  if (date > todayDate) {
-    return today;
-  }
-  return formatDateInputValue(date);
-}
-
-function formatMonthOffsetDate(monthOffset: number, day: number) {
-  const date = new Date(todayDate.getFullYear(), todayDate.getMonth() + monthOffset, day);
-  if (date > todayDate) {
-    return today;
-  }
-  return formatDateInputValue(date);
-}
-
-async function refreshDemoData() {
-  loadDemoCategories();
-  loadDemoRecent();
-  loadDemoHomeSummary();
-  if (currentView.value === 'history') {
-    loadDemoHistory();
-    loadDemoHistorySummary();
-    loadDemoHistoryTrend();
-  }
-}
-
-function addDemoTransactions() {
-  const now = new Date().toISOString();
-  const createdTransactions = rows.value.map((row) => ({
-    id: `demo-${demoTransactionId++}`,
-    type: row.type as TransactionType,
-    transactionDate: row.transactionDate,
-    amount: Number(row.amount),
-    categoryName: getCategoryName(row),
-    note: row.note.trim() || null,
-    createdAt: now
-  }));
-  demoTransactions.value = [...createdTransactions, ...demoTransactions.value];
-}
-
-function updateDemoTransaction(transactionId: string) {
-  demoTransactions.value = demoTransactions.value.map((transaction) => {
-    if (transaction.id !== transactionId) {
-      return transaction;
-    }
-    return {
-      ...transaction,
-      type: editForm.value.type,
-      transactionDate: editForm.value.transactionDate,
-      amount: Number(editForm.value.amount),
-      categoryName: getEditCategoryName(),
-      note: editForm.value.note.trim() || null
-    };
-  });
-}
-
-function deleteDemoTransaction(transactionId: string) {
-  demoTransactions.value = demoTransactions.value.filter((transaction) => transaction.id !== transactionId);
-}
-
-function loadDemoCategories() {
-  categoryOptions.value = {
-    EXPENSE: mergeCategories(defaultExpenseCategories, listDemoCategories('EXPENSE')),
-    INCOME: mergeCategories(defaultIncomeCategories, listDemoCategories('INCOME'))
-  };
-}
-
-function listDemoCategories(type: TransactionType) {
-  return demoTransactions.value
-    .filter((transaction) => transaction.type === type)
-    .map((transaction) => transaction.categoryName);
-}
-
-function loadDemoRecent() {
-  recentTransactions.value = [...demoTransactions.value]
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-    .slice(0, recentLimit.value);
-}
-
-function loadDemoHomeSummary() {
-  expenseCategorySummaries.value = buildDemoCategorySummary('EXPENSE', defaultMonthStartDate, today);
-  incomeCategorySummaries.value = buildDemoCategorySummary('INCOME', defaultMonthStartDate, today);
-}
-
-function loadDemoHistory() {
-  if (historyStartDate.value > historyEndDate.value) {
-    historyTransactions.value = [];
-    historyHasNext.value = false;
-    showMessage('開始日期不可晚於結束日期');
-    return;
-  }
-
-  const filteredTransactions = filterDemoTransactions(historyType.value, historyStartDate.value, historyEndDate.value)
-    .sort((left, right) => right.transactionDate.localeCompare(left.transactionDate));
-  const start = historyPage.value * historySize.value;
-  historyTransactions.value = filteredTransactions.slice(start, start + historySize.value);
-  historyHasNext.value = filteredTransactions.length > start + historySize.value;
-}
-
-function loadDemoHistorySummary() {
-  historyExpenseCategorySummaries.value = buildDemoCategorySummary('EXPENSE', historyStartDate.value, historyEndDate.value);
-  historyIncomeCategorySummaries.value = buildDemoCategorySummary('INCOME', historyStartDate.value, historyEndDate.value);
-}
-
-function loadDemoHistoryTrend() {
-  const year = historyTrendYear.value;
-  const yearlyTransactions = demoTransactions.value.filter((transaction) => transaction.transactionDate.startsWith(`${year}-`));
-  if (yearlyTransactions.length === 0) {
-    historyTrendPoints.value = [];
-    return;
-  }
-
-  let cumulativeAmount = 0;
-  historyTrendPoints.value = Array.from({ length: 12 }, (_, index) => {
-    const month = String(index + 1).padStart(2, '0');
-    const label = `${year}-${month}`;
-    const amount = yearlyTransactions
-      .filter((transaction) => transaction.transactionDate.startsWith(label))
-      .reduce((total, transaction) => {
-        return total + (transaction.type === 'INCOME' ? transaction.amount : -transaction.amount);
-      }, 0);
-    cumulativeAmount += amount;
-    return {
-      label,
-      amount,
-      cumulativeAmount
-    };
-  });
-}
-
-function buildDemoCategorySummary(type: TransactionType, startDate: string, endDate: string) {
-  const groupedAmounts = new Map<string, number>();
-  for (const transaction of filterDemoTransactions(type, startDate, endDate)) {
-    groupedAmounts.set(transaction.categoryName, (groupedAmounts.get(transaction.categoryName) ?? 0) + transaction.amount);
-  }
-
-  const total = Array.from(groupedAmounts.values()).reduce((sum, amount) => sum + amount, 0);
-  if (total <= 0) {
-    return [];
-  }
-
-  return Array.from(groupedAmounts.entries())
-    .map(([categoryName, amount]) => ({
-      categoryName,
-      amount,
-      percentage: calculatePercentage(amount, total)
-    }))
-    .sort((left, right) => right.amount - left.amount);
-}
-
-function filterDemoTransactions(type: TransactionType, startDate: string, endDate: string) {
-  return demoTransactions.value.filter((transaction) => {
-    return transaction.type === type
-      && transaction.transactionDate >= startDate
-      && transaction.transactionDate <= endDate;
-  });
 }
 
 function getSignInErrorMessage(error: unknown) {
