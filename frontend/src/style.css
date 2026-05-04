@@ -583,7 +583,7 @@ h1::after,
   z-index: 1;
   display: grid;
   align-items: start;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 0.88fr) minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 2.8fr) 40px;
+  grid-template-columns: minmax(88px, 0.95fr) minmax(136px, 1.15fr) minmax(84px, 0.72fr) minmax(112px, 0.95fr) minmax(0, 2.15fr) 40px;
   grid-template-areas: "type date amount category note remove";
   gap: 10px;
   border: 1.5px solid var(--line);
@@ -654,6 +654,11 @@ h1::after,
 
 .entry-card > :nth-child(6) {
   grid-area: remove;
+}
+
+.entry-card > :nth-child(1) select,
+.entry-card > :nth-child(2) input {
+  min-width: 0;
 }
 
 .entry-row input:hover,
@@ -1918,7 +1923,7 @@ td[colspan] {
   }
 
   .entry-card {
-    grid-template-columns: minmax(0, 0.68fr) minmax(0, 0.86fr) minmax(0, 0.68fr) minmax(0, 0.95fr) minmax(0, 2.9fr) 36px;
+    grid-template-columns: minmax(84px, 0.88fr) minmax(124px, 1.08fr) minmax(72px, 0.66fr) minmax(96px, 0.86fr) minmax(0, 2fr) 36px;
     grid-template-areas: "type date amount category note remove";
     gap: 8px;
   }
