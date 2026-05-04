@@ -81,6 +81,7 @@ const MAX_RECENT_LIMIT = 15;
 const DEFAULT_HISTORY_SIZE = 10;
 const MAX_HISTORY_SIZE = 20;
 const PERCENTAGE_MULTIPLIER = 100;
+const APP_TIME_ZONE = 'Asia/Taipei';
 
 export async function listCategorySummaries(
   supabase: SupabaseClient,
@@ -138,7 +139,7 @@ export async function listAnnualCashFlowTrend(
   year: number,
   today = new Date()
 ): Promise<HistoryTrendPointResponse[]> {
-  const todayText = today.toISOString().slice(0, 10);
+  const todayText = formatAppDate(today);
   const todayYear = Number(todayText.slice(0, 4));
   const endMonth = getAnnualTrendEndMonth(year, todayYear, Number(todayText.slice(5, 7)));
   if (endMonth === 0) {
@@ -354,7 +355,7 @@ export function resolveSummaryDateRange(
   if (startDate !== undefined && endDate !== undefined) {
     return { startDate, endDate };
   }
-  const today = now.toISOString().slice(0, 10);
+  const today = formatAppDate(now);
   return { startDate: `${today.slice(0, 7)}-01`, endDate: today };
 }
 
@@ -584,11 +585,22 @@ function validateTransactionDate(transactionDate: unknown, index: number, now: D
     throw new RangeError(`Transaction ${index + 1} date is invalid`);
   }
   validateDateValue(transactionDate, `Transaction ${index + 1} date`);
-  const today = now.toISOString().slice(0, 10);
+  const today = formatAppDate(now);
   if (transactionDate > today) {
     throw new RangeError(`Transaction ${index + 1} date cannot be in the future`);
   }
   return transactionDate;
+}
+
+function formatAppDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  return `${values.get('year')}-${values.get('month')}-${values.get('day')}`;
 }
 
 function validateDateValue(dateValue: string, fieldName: string): string {

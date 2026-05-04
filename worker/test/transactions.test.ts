@@ -320,6 +320,21 @@ test('validateBatchCreateRequest rejects future date', () => {
   );
 });
 
+test('validateBatchCreateRequest uses Asia Taipei date for today validation', () => {
+  const taipeiTodayWhenUtcIsPreviousDay = new Date('2026-05-04T16:30:00.000Z');
+
+  const transactions = validateBatchCreateRequest({
+    transactions: [{
+      type: 'EXPENSE',
+      transactionDate: '2026-05-05',
+      amount: 100,
+      categoryName: '飲食'
+    }]
+  }, taipeiTodayWhenUtcIsPreviousDay);
+
+  assert.equal(transactions[0].transactionDate, '2026-05-05');
+});
+
 test('validateBatchCreateRequest normalizes fields', () => {
   const transactions = validateBatchCreateRequest({
     transactions: [{
@@ -395,6 +410,17 @@ test('summary date and trend year parsers normalize optional params', () => {
   });
   assert.equal(parseTrendYear(new URLSearchParams(), fixedNow), 2026);
   assert.equal(parseTrendYear(new URLSearchParams({ year: '2025' }), fixedNow), 2025);
+});
+
+test('resolveSummaryDateRange uses Asia Taipei date for default month range', () => {
+  assert.deepEqual(resolveSummaryDateRange(
+    undefined,
+    undefined,
+    new Date('2026-05-04T16:30:00.000Z')
+  ), {
+    startDate: '2026-05-01',
+    endDate: '2026-05-05'
+  });
 });
 
 test('createBatchTransactions uses existing default category and authenticated user id', async () => {
