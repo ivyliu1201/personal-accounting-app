@@ -15,6 +15,7 @@ frontend/*.tsbuildinfo
 frontend/vite-dev.*
 
 # Cloudflare Workers POC
+.wrangler/
 worker/node_modules/
 worker/dist/
 worker/.wrangler/
