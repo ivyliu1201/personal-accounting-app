@@ -1,4 +1,4 @@
-# Personal Accounting App
+﻿# Personal Accounting App
 
 個人記帳 Web App。MVP 目前提供 Google 登入、批次新增記帳、最近明細、類別摘要、歷史查看、年度現金流趨勢、編輯與刪除。
 
@@ -26,6 +26,7 @@ http://localhost:5173
 - 啟動 Worker `http://localhost:8787`。
 - 啟動前端 `http://localhost:5173`，並讓前端 API 指向 Worker。
 - 執行 Worker local smoke check。
+- 前端 Vite 會從 repo root 的 `.env` 讀取 `VITE_FIREBASE_*` 與 `VITE_API_PROXY_TARGET`。
 
 手動方式如下。
 
@@ -54,6 +55,7 @@ http://localhost:5173
 注意：
 
 - Firebase 登入本機測試請使用 `localhost`，不要使用 `127.0.0.1`。
+- `frontend` 的 Vite 設定會從 repo root 的 `.env` 讀取 Firebase Web 設定，所以前端相關環境變數請維持在專案根目錄。
 - Worker 交易 API 需要 Firebase ID token；未登入時 protected API 回 `401` 是預期行為。
 - 本機 Worker 使用 Wrangler local D1，不會部署到 Cloudflare，也不會產生雲端費用。
 
@@ -212,6 +214,7 @@ VITE_API_PROXY_TARGET=http://localhost:8080
 說明：
 
 - 前端 Firebase Web 設定使用 `VITE_FIREBASE_*`，會在前端 build 時注入。
+- `frontend/vite.config.ts` 會從 repo root `.env` 讀取前端環境變數，所以本機開發時請把 `VITE_FIREBASE_*` 和 `VITE_API_PROXY_TARGET` 放在專案根目錄 `.env`。
 - `VITE_API_PROXY_TARGET=http://localhost:8787` 可讓 Vite dev server 指向本機 Worker。
 - `VITE_API_PROXY_TARGET=http://localhost:8080` 可讓 Vite dev server 指向 Spring Boot。
 - 若設定 `VITE_API_BASE_URL`，前端會直接把 `/api/...` 請求送到該 base URL；跨網域使用 Worker 時需先完成 Worker CORS 設定。
@@ -221,3 +224,4 @@ VITE_API_PROXY_TARGET=http://localhost:8080
 - 目前本機 Worker + local D1 不需要付費。
 - 不要直接執行 Cloudflare deploy 或建立遠端 D1，除非已確認 Cloudflare 帳號、額度與付款需求。
 - 任何需要 Cloudflare Workers Paid、D1 付費額度、綁定信用卡或其他付費功能的操作，都必須先取得使用者確認。
+

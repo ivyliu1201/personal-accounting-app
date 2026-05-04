@@ -1,4 +1,4 @@
-# Cloudflare Worker Backend
+﻿# Cloudflare Worker Backend
 
 This directory contains the Cloudflare Worker backend for the personal accounting app.
 
@@ -61,6 +61,8 @@ Then open:
 http://localhost:5173
 ```
 
+Use `localhost` for Firebase local login. Do not switch this dev server to `127.0.0.1`, and keep the frontend Firebase Web env values in the repo root `.env` so Vite can read them.
+
 Successful transaction API calls require a valid Firebase login token. Without login, protected Worker endpoints returning `401` is expected.
 
 ## Firebase Auth Notes
@@ -103,3 +105,4 @@ Successful transaction API calls require a valid Firebase login token. Without l
 Local Wrangler and local D1 verification do not require paid Cloudflare features.
 
 Do not create remote D1 databases, deploy Workers, enable Workers Paid, bind credit cards, or enable any paid Cloudflare feature without explicit user confirmation.
+
