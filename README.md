@@ -1,22 +1,82 @@
-﻿# Personal Accounting App
+# Personal Accounting App
 
-個人記帳 Web App。MVP 目前提供 Google 登入、批次新增記帳、最近明細、類別摘要、歷史查看、年度現金流趨勢、編輯與刪除。
+個人記帳 Web App，用來快速記錄收入與支出，並透過首頁摘要、最近明細、歷史查詢與現金流趨勢，查看自己的消費與收入狀況。
 
-## 目前建議測試方式
+<p align="center">
+  <img src="./個人記帳的瀏覽圖.png" alt="個人記帳系統歷史查看頁面截圖">
+</p>
 
-目前建議用本機 Spring Boot（連 Supabase Postgres）+ 本機前端測試。
+## 目前狀態
 
-最快方式：
+本專案目前以 V2 文件為準，主線架構為：
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-local-backend-app.ps1
+```text
+Vue 3 前端
+  -> Cloudflare Worker API
+  -> Supabase Postgres
 ```
 
-再開另一個終端機啟動前端：
+登入驗證使用 Firebase Authentication 的 Google 登入。前端取得 Firebase ID token 後，呼叫 `/api/...`，由 Worker 驗證 token 並以 Firebase uid 隔離使用者資料。
+
+## 功能
+
+- Google 登入與登出。
+- 依使用者隔離個人帳目。
+- 批次新增收入與支出。
+- 首頁查看本月類別摘要、甜甜圈圖與最近明細。
+- 歷史查看依日期區間查詢帳目。
+- 歷史查看支援類別分布與年度現金流趨勢。
+- 在歷史查看頁編輯與刪除單筆帳目。
+- 支援預設類別與新增自訂類別。
+
+## 技術棧
+
+| Layer | Tech |
+| --- | --- |
+| Frontend | Vue 3, Vite, TypeScript |
+| Auth | Firebase Authentication |
+| API | Cloudflare Workers |
+| Database | Supabase Postgres |
+| Deploy | Cloudflare Pages, Cloudflare Workers |
+
+## 專案結構
+
+```text
+frontend/   Vue 3 前端
+worker/     Cloudflare Worker API
+docs/v2/    目前版本產品、架構、API、測試與 AI 協作文件
+```
+
+## 本機開發
+
+詳細規則請看 [`docs/v2/07-development.md`](./docs/v2/07-development.md)。
+
+安裝前端依賴：
 
 ```powershell
 cd frontend
-$env:VITE_API_PROXY_TARGET='http://localhost:8080'
+npm install
+```
+
+安裝 Worker 依賴：
+
+```powershell
+cd worker
+npm install
+```
+
+啟動本機 Worker：
+
+```powershell
+cd worker
+npm run dev:local
+```
+
+啟動前端：
+
+```powershell
+cd frontend
+$env:VITE_API_PROXY_TARGET='http://localhost:8787'
 npm run dev -- --host localhost
 ```
 
@@ -26,55 +86,9 @@ npm run dev -- --host localhost
 http://localhost:5173
 ```
 
-注意：
+Firebase 本機登入請使用 `localhost`。
 
-- Firebase 登入本機測試請使用 `localhost`，不要使用 `127.0.0.1`。
-- `frontend` 的 Vite 設定會從 repo root 的 `.env` 讀取 Firebase Web 設定，所以前端相關環境變數請維持在專案根目錄。
-- 後端保護 API 需要 Firebase ID token；未登入時回 `401` 是預期行為。
-
-## Docker 啟動
-
-Docker Compose 目前仍是 Spring Boot 路徑；資料庫可用容器 PostgreSQL 或 Supabase Postgres。
-
-啟動整套服務：
-
-```powershell
-docker compose up -d
-```
-
-服務啟動後開啟：
-
-```text
-http://localhost:5173
-```
-
-Docker 服務：
-
-| Service | Port | 用途 |
-| --- | ---: | --- |
-| frontend | 5173 | Vue 前端網站 |
-| backend | 8080 | Spring Boot API |
-| postgres | 15432 | PostgreSQL |
-
-停止整套服務：
-
-```powershell
-docker compose down
-```
-
-查看服務狀態：
-
-```powershell
-docker compose ps
-```
-
-如果 Docker 版前端或後端已經啟動，先停止它們再跑本機服務，避免 port 衝突：
-
-```powershell
-docker compose stop frontend backend
-```
-
-## 測試與檢查
+## 測試
 
 前端 build：
 
@@ -90,105 +104,38 @@ cd frontend
 npm run test:date-format
 ```
 
-Worker 測試：
-
-```powershell
-不使用（已停用，見 worker/README.md）
-```
-
-後端測試：
-
-```powershell
-cd backend
-.\mvnw.cmd test
-```
-
-Docker compose 設定檢查：
-
-```powershell
-docker compose config
-```
-
-## 環境變數
-
-可參考 `.env.example` 建立或調整本機 `.env`。
-
-常用變數：
-
-```text
-FRONTEND_PORT=5173
-BACKEND_PORT=8080
-POSTGRES_PORT=15432
-POSTGRES_DB=personal_accounting
-POSTGRES_USER=personal_accounting
-POSTGRES_PASSWORD=change_me
-APP_DEV_USER_ID=dev-user
-APP_AUTH_DEV_FALLBACK_ENABLED=true
-APP_FIREBASE_ENABLED=false
-APP_ALLOWED_USER_EMAILS=your-email@example.com
-FIREBASE_SERVICE_ACCOUNT_PATH=C:\path\to\personal-accounting-firebase-admin.json
-VITE_FIREBASE_API_KEY=your-web-api-key
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-VITE_FIREBASE_APP_ID=your-web-app-id
-VITE_API_BASE_URL=
-VITE_API_PROXY_TARGET=http://localhost:8080
-```
-
-說明：
-
-- 前端 Firebase Web 設定使用 `VITE_FIREBASE_*`，會在前端 build 時注入。
-- `frontend/vite.config.ts` 會從 repo root `.env` 讀取前端環境變數，所以本機開發時請把 `VITE_FIREBASE_*` 和 `VITE_API_PROXY_TARGET` 放在專案根目錄 `.env`。
-- `VITE_API_PROXY_TARGET=http://localhost:8080` 可讓 Vite dev server 指向 Spring Boot。
-- 若設定 `VITE_API_BASE_URL`，前端會直接把 `/api/...` 請求送到該 base URL；跨網域時需先完成後端 CORS 設定。
-- `APP_CORS_ALLOWED_ORIGINS` 用逗號分隔可允許的前端網域（例如 `http://localhost:5173,https://your-pages.pages.dev`）。
-
-Supabase 連線請設定：
-
-```text
-SPRING_DATASOURCE_URL=jdbc:postgresql://<supabase-host>:5432/postgres?sslmode=require
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=<your-supabase-db-password>
-```
-
-## Cloudflare 佈署前提醒
-
-- 目前資料庫路徑為 Supabase Postgres，非 D1。
-- 部署到 Cloudflare 前，請先確認後端實際部署位置與 CORS allowed origins。
-
-## Cloudflare Worker 後端（Supabase）
-
-Worker 需要這三個 secret：
-
-- `FIREBASE_PROJECT_ID`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-部署指令：
+Worker type check：
 
 ```powershell
 cd worker
-wrangler secret put FIREBASE_PROJECT_ID
-wrangler secret put SUPABASE_URL
-wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npm run deploy
+npm run typecheck
 ```
 
-## Cloudflare 線上部署（前端）
-
-1. 設定後端正式 URL（可連 Supabase）。
-2. 在後端環境設定：
-   - `APP_CORS_ALLOWED_ORIGINS=https://<your-pages-domain>`
-3. 前端 build 前設定：
-   - `VITE_API_BASE_URL=https://<your-backend-domain>`
-4. 建置前端：
+Worker 測試：
 
 ```powershell
-cd frontend
-npm run build
+cd worker
+npm test
 ```
 
-5. 部署 `frontend/dist` 到 Cloudflare Pages（或你既有的 Cloudflare 靜態站流程）。
+完整測試策略請看 [`docs/v2/08-testing.md`](./docs/v2/08-testing.md)。
 
+## 文件
+
+V2 文件是目前專案的主要依據：
+
+- [`docs/v2/00-current-status.md`](./docs/v2/00-current-status.md)：目前系統狀態入口。
+- [`docs/v2/01-product-spec.md`](./docs/v2/01-product-spec.md)：產品規格。
+- [`docs/v2/02-wireframe.md`](./docs/v2/02-wireframe.md)：版面輔助。
+- [`docs/v2/03-architecture.md`](./docs/v2/03-architecture.md)：系統架構。
+- [`docs/v2/04-api.md`](./docs/v2/04-api.md)：API 契約。
+- [`docs/v2/05-database.md`](./docs/v2/05-database.md)：資料庫規則。
+- [`docs/v2/06-env.md`](./docs/v2/06-env.md)：環境變數。
+- [`docs/v2/07-development.md`](./docs/v2/07-development.md)：本機開發。
+- [`docs/v2/08-testing.md`](./docs/v2/08-testing.md)：測試策略。
+- [`docs/v2/09-deployment.md`](./docs/v2/09-deployment.md)：部署。
+- [`docs/v2/AGENTS.md`](./docs/v2/AGENTS.md)：AI 協作規則。
+
+## 範圍
+
+目前目標是個人記帳 MVP。預算管理、週期性帳目、匯入匯出、多幣別、共享帳本、OCR、AI 分析、通知與手機 App 等功能不在目前範圍內。
