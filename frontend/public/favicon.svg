@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="個人記帳">
+  <defs>
+    <radialGradient id="bag" cx="35%" cy="24%" r="76%">
+      <stop offset="0" stop-color="#FFFDF7"/>
+      <stop offset="0.56" stop-color="#C8EFFF"/>
+      <stop offset="1" stop-color="#82B9D6"/>
+    </radialGradient>
+    <radialGradient id="coin" cx="34%" cy="24%" r="78%">
+      <stop offset="0" stop-color="#FFF5B8"/>
+      <stop offset="0.42" stop-color="#FFE58F"/>
+      <stop offset="0.78" stop-color="#F5AE60"/>
+      <stop offset="1" stop-color="#E99058"/>
+    </radialGradient>
+  </defs>
+  <path d="M17 52c-7-6-9-19-3-28 3-5 7-7 12-9-3-3-4-7-2-10 4 2 7 3 10 3s6-1 10-3c2 3 1 7-2 10 6 2 10 5 13 11 5 10 2 22-6 27-8 5-24 5-32-1z" fill="#3F7F96" opacity=".22"/>
+  <path d="M15 48c-6-7-6-18 0-25 3-4 8-7 14-8-4-3-5-7-3-11 3 2 6 3 9 3s6-1 9-3c2 4 1 8-3 11 6 1 11 4 14 9 5 8 3 18-4 25-8 7-28 7-36-1z" fill="url(#bag)" stroke="#3F7F96" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M24 16c5 3 16 3 21 0" fill="none" stroke="#3F7F96" stroke-width="2.4" stroke-linecap="round" opacity=".68"/>
+  <path d="M18 25c4-6 11-8 18-6 5 1 10 3 13 7" fill="none" stroke="#FFFDF7" stroke-width="3" stroke-linecap="round" opacity=".72"/>
+  <circle cx="32" cy="34" r="17" fill="url(#coin)" stroke="#C66B3D" stroke-width="2.4"/>
+  <path d="M20 40c4 6 11 8 18 6 5-1 9-4 12-8" fill="none" stroke="#C66B3D" stroke-width="3.2" stroke-linecap="round" opacity=".28"/>
+  <ellipse cx="26" cy="25" rx="6.5" ry="3.8" fill="#FFFDF7" opacity=".52"/>
+  <path d="M32 20v28M39 26c-3-4-12-3-12.5 2-.5 5 12 4 11.3 10-.7 5-10 6-13.8 1" fill="none" stroke="#9A5A24" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13 44c5 5 12 8 21 8 8 0 14-2 18-6" fill="none" stroke="#FFFDF7" stroke-width="2.3" stroke-linecap="round" opacity=".5"/>
+</svg>
