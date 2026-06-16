@@ -161,26 +161,44 @@
         </section>
 
         <section class="details-panel">
-          <div class="panel-header">
-            <h2>今日紀錄</h2>
-            <select v-model.number="recentLimit" aria-label="最近筆數" @change="loadRecent()">
-              <option :value="5">5 筆</option>
-              <option :value="10">10 筆</option>
-              <option :value="15">15 筆</option>
-            </select>
+          <div class="panel-header today-record-header">
+            <div class="today-record-title">
+              <h2>今日紀錄</h2>
+              <select
+                v-if="recentDetailsExpanded"
+                v-model.number="recentLimit"
+                class="recent-limit-select"
+                aria-label="今日紀錄筆數"
+                @change="loadRecent()"
+              >
+                <option :value="5">5 筆</option>
+                <option :value="10">10 筆</option>
+                <option :value="15">15 筆</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              class="compact-toggle"
+              :aria-expanded="recentDetailsExpanded"
+              @click="recentDetailsExpanded = !recentDetailsExpanded"
+            >
+              {{ recentDetailsExpanded ? '收合' : '查看' }}
+            </button>
           </div>
 
-          <TransactionsTable
-            :transactions="recentTransactions"
-            :loading="isLoadingRecent"
-            empty-label="目前沒有資料"
-          />
-          <button type="button" @click="showHistory">
-            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-            查看全部
-          </button>
+          <template v-if="recentDetailsExpanded">
+            <TransactionsTable
+              :transactions="recentTransactions"
+              :loading="isLoadingRecent"
+              empty-label="目前沒有資料"
+            />
+            <button type="button" @click="showHistory">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+              查看全部
+            </button>
+          </template>
         </section>
       </section>
     </section>
@@ -605,6 +623,7 @@ const summaryMode = ref<SummaryMode>('EXPENSE');
 const historySummaryMode = ref<SummaryMode>('EXPENSE');
 const summaryDetailsExpanded = ref(false);
 const historySummaryDetailsExpanded = ref(false);
+const recentDetailsExpanded = ref(false);
 const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
 const isLoadingHistory = ref(false);
