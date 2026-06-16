@@ -18,8 +18,8 @@ VITE_API_PROXY_TARGET=
 規則：
 
 - `VITE_FIREBASE_*` 為 Firebase Web config。
-- `VITE_API_BASE_URL` 讓前端 API 請求指向已部署的 Worker URL。
-- `VITE_API_PROXY_TARGET` 用於本機開發時的 Vite proxy。
+- `VITE_API_BASE_URL` 讓 production build 的前端 API 請求指向已部署的 Worker URL；dev 模式會忽略此值。
+- `VITE_API_PROXY_TARGET` 用於本機開發時的 Vite proxy，dev 模式的 `/api/...` 會走此目標。
 - 不得把 Supabase service role key 放進前端變數。
 
 ## 2. Worker 變數與 secrets
@@ -35,14 +35,21 @@ APP_CORS_ALLOWED_ORIGINS=
 
 規則：
 
-- `FIREBASE_PROJECT_ID` 用於驗證 Firebase ID token 的 issuer 與 audience。
+- `FIREBASE_PROJECT_ID` 用於驗證 Firebase ID token 的 issuer 與 audience；本機若未設定，Worker 會 fallback 使用 `VITE_FIREBASE_PROJECT_ID`。
 - `SUPABASE_URL` 是 Supabase project URL。
 - `SUPABASE_SERVICE_ROLE_KEY` 必須視為密鑰。
 - `APP_CORS_ALLOWED_ORIGINS` 是前端 origin allowlist，以逗號分隔。
 
 ## 3. 本機開發
 
-本機開發可從 `.env` 或 Worker 本機 secret 檔讀取設定。
+本機開發預設從專案根目錄 `.env` 讀取 Worker 設定：
+
+```powershell
+cd worker
+npm run dev:local
+```
+
+`dev:local` 會透過 `wrangler dev --env-file ../.env` 載入設定，避免把 Supabase service role key 複製到 `worker/.dev.vars`。
 
 不得提交真實密鑰。
 

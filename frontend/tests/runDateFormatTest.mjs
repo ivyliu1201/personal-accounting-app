@@ -18,9 +18,11 @@ try {
     temporaryOutputDirectory,
     '--noEmit',
     'false',
-    'src/dateFormat.ts'
+    'src/dateFormat.ts',
+    'src/apiConfig.ts'
   ], { stdio: 'inherit' });
   execFileSync(process.execPath, ['--test', 'tests/dateFormat.test.mjs'], { stdio: 'inherit' });
+  execFileSync(process.execPath, ['--test', 'tests/apiConfig.test.mjs'], { stdio: 'inherit' });
 } finally {
   rmSync(temporaryOutputDirectory, { recursive: true, force: true });
 }

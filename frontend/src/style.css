@@ -1116,6 +1116,13 @@ td[colspan] {
   margin-bottom: 0;
 }
 
+.summary-toggle {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0 0 12px;
+}
+
 .summary-table tbody td:nth-child(2) {
   font-family: var(--font-numeric);
   font-weight: 800;
@@ -1836,6 +1843,11 @@ td[colspan] {
 }
 
 @media (max-width: 640px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
   .app-shell {
     padding-bottom: 18px;
     overflow-x: hidden;
@@ -1888,6 +1900,12 @@ td[colspan] {
     min-width: 0;
     -webkit-appearance: none;
     appearance: none;
+  }
+
+  input,
+  select,
+  button {
+    font-size: 16px;
   }
 
   .entry-panel,
@@ -1954,6 +1972,20 @@ td[colspan] {
       "note note"
       "remove remove";
     gap: 8px;
+    width: 100%;
+    overflow: hidden;
+    contain: layout;
+  }
+
+  .entry-card:hover {
+    transform: none;
+  }
+
+  .entry-card input,
+  .entry-card select,
+  .category-field,
+  .date-field {
+    max-width: 100%;
   }
 
   .entry-card > :nth-child(2) {

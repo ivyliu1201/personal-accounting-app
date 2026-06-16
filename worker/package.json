@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "dev:local": "wrangler dev --local --port 8787",
+    "dev:local": "wrangler dev --local --port 8787 --env-file ../.env",
     "d1:migrate:local": "wrangler d1 migrations apply personal-accounting-poc --local",
     "smoke:local": "tsx scripts/smoke-local.ts",
     "deploy": "wrangler deploy",

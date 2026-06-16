@@ -74,6 +74,6 @@ https://personal-accounting-frontend.pages.dev
 - 確認未登入首頁可載入。
 - 使用 Google 登入。
 - 確認 `/api/auth/me` 成功。
-- 確認最近明細可載入。
+- 確認今日明細可載入。
 - 若使用測試帳號，建立一筆小額測試帳目。
 - 確認首頁與歷史查看可更新。

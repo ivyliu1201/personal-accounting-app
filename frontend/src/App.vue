@@ -55,7 +55,6 @@
               <input
                 v-model="row.transactionDate"
                 type="date"
-                :max="today"
                 :class="{ empty: !row.transactionDate }"
                 aria-label="日期"
                 @blur="focusedDateRowId = null"
@@ -145,12 +144,25 @@
             :loading="isLoadingSummary"
             empty-label="本月沒有資料"
           />
-          <SummaryTable :summaries="activeSummaryRows" :loading="isLoadingSummary" empty-label="本月沒有資料" />
+          <button
+            type="button"
+            class="summary-toggle"
+            :aria-expanded="summaryDetailsExpanded"
+            @click="summaryDetailsExpanded = !summaryDetailsExpanded"
+          >
+            {{ summaryDetailsExpanded ? '收合明細' : '查看明細' }}
+          </button>
+          <SummaryTable
+            v-if="summaryDetailsExpanded"
+            :summaries="activeSummaryRows"
+            :loading="isLoadingSummary"
+            empty-label="本月沒有資料"
+          />
         </section>
 
         <section class="details-panel">
           <div class="panel-header">
-            <h2>最近紀錄</h2>
+            <h2>今日紀錄</h2>
             <select v-model.number="recentLimit" aria-label="最近筆數" @change="loadRecent()">
               <option :value="5">5 筆</option>
               <option :value="10">10 筆</option>
@@ -182,8 +194,8 @@
               <option value="EXPENSE">支出</option>
               <option value="INCOME">收入</option>
             </select>
-            <input v-model="historyStartDate" type="date" :max="today" aria-label="開始日期" @change="resetHistoryPageAndLoad" />
-            <input v-model="historyEndDate" type="date" :max="today" aria-label="結束日期" @change="resetHistoryPageAndLoad" />
+            <input v-model="historyStartDate" type="date" aria-label="開始日期" @change="resetHistoryPageAndLoad" />
+            <input v-model="historyEndDate" type="date" aria-label="結束日期" @change="resetHistoryPageAndLoad" />
             <select v-model.number="historySize" aria-label="每頁筆數" @change="resetHistoryPageAndLoad">
               <option :value="10">10 筆</option>
               <option :value="15">15 筆</option>
@@ -253,7 +265,16 @@
             :loading="isLoadingHistorySummary"
             empty-label="查詢區間沒有資料"
           />
+          <button
+            type="button"
+            class="summary-toggle"
+            :aria-expanded="historySummaryDetailsExpanded"
+            @click="historySummaryDetailsExpanded = !historySummaryDetailsExpanded"
+          >
+            {{ historySummaryDetailsExpanded ? '收合明細' : '查看明細' }}
+          </button>
           <SummaryTable
+            v-if="historySummaryDetailsExpanded"
             :summaries="activeHistorySummaryRows"
             :loading="isLoadingHistorySummary"
             empty-label="查詢區間沒有資料"
@@ -342,7 +363,7 @@
           </label>
           <label>
             <span>日期</span>
-            <input v-model="editForm.transactionDate" type="date" :max="today" />
+            <input v-model="editForm.transactionDate" type="date" />
           </label>
           <label>
             <span>金額</span>
@@ -437,6 +458,7 @@ import {
   type User
 } from 'firebase/auth';
 import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue';
+import { resolveConfiguredApiBaseUrl } from './apiConfig';
 import { formatDateTime } from './dateFormat';
 import watercolorMascotUrl from './assets/watercolor-mascot.png';
 import watercolorMascotPinkUrl from './assets/watercolor-mascot-pink.png';
@@ -552,7 +574,7 @@ const firebaseConfigured = Object.values(firebaseConfig).every((value) => Boolea
 const firebaseApp = firebaseConfigured ? initializeApp(firebaseConfig) : null;
 const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 const googleProvider = new GoogleAuthProvider();
-const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
+const apiBaseUrl = resolveConfiguredApiBaseUrl(import.meta.env.VITE_API_BASE_URL, import.meta.env.PROD);
 
 const todayDate = new Date();
 const today = formatDateInputValue(todayDate);
@@ -581,6 +603,8 @@ const historySize = ref(10);
 const historyHasNext = ref(false);
 const summaryMode = ref<SummaryMode>('EXPENSE');
 const historySummaryMode = ref<SummaryMode>('EXPENSE');
+const summaryDetailsExpanded = ref(false);
+const historySummaryDetailsExpanded = ref(false);
 const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
 const isLoadingHistory = ref(false);
@@ -807,8 +831,8 @@ onMounted(() => {
 function createRow(): EntryRow {
   return {
     id: rowId++,
-    type: '',
-    transactionDate: '',
+    type: 'EXPENSE',
+    transactionDate: today,
     amount: '',
     categoryName: '',
     customCategoryName: '',
@@ -1073,7 +1097,7 @@ function getEditCategoryName() {
 
 async function refreshAfterMutation() {
   if (currentView.value === 'history') {
-    await Promise.all([
+    const results = await Promise.all([
       loadHistory(),
       loadHistoryCategorySummary(),
       loadHistoryTrend(),
@@ -1081,14 +1105,15 @@ async function refreshAfterMutation() {
       loadCategorySummary(false),
       loadCategories(false)
     ]);
-    return;
+    return results.every(Boolean);
   }
 
-  await Promise.all([
+  const results = await Promise.all([
     loadRecent(false),
     loadCategorySummary(false),
     loadCategories(false)
   ]);
+  return results.every(Boolean);
 }
 
 function setSummaryMode(mode: SummaryMode) {
@@ -1144,13 +1169,13 @@ async function loadRecent(showError = true) {
   try {
     const response = await apiFetch(`/api/transactions/recent?limit=${recentLimit.value}`);
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '最近紀錄載入失敗'));
+      throw new Error(await getErrorMessage(response, '今日紀錄載入失敗'));
     }
     recentTransactions.value = await response.json() as TransactionResponse[];
     return true;
   } catch (error) {
     if (showError) {
-      showMessage(error instanceof Error ? error.message : '最近紀錄載入失敗');
+      showMessage(error instanceof Error ? error.message : '今日紀錄載入失敗');
     }
     return false;
   } finally {
@@ -1304,10 +1329,16 @@ async function signInWithGoogle() {
 
   try {
     await signInWithPopup(firebaseAuth, googleProvider);
-    showMessage('登入完成');
-    await refreshAfterMutation();
   } catch (error) {
     showMessage(getSignInErrorMessage(error));
+    return;
+  }
+
+  try {
+    const refreshed = await refreshAfterMutation();
+    showMessage(refreshed ? '登入完成' : '登入完成，部分資料載入失敗');
+  } catch {
+    showMessage('登入完成，資料重新載入失敗');
   }
 }
 
@@ -1338,6 +1369,9 @@ function resetProtectedData() {
 
 function getSignInErrorMessage(error: unknown) {
   if (error instanceof FirebaseError) {
+    if (error.code === 'auth/unauthorized-domain') {
+      return '登入失敗：本機請使用 http://localhost:5173/，並確認 Firebase 已允許 localhost';
+    }
     return `登入失敗：${error.code}`;
   }
   return '登入失敗，請稍後再試';
@@ -1360,13 +1394,6 @@ function resolveApiInput(input: RequestInfo | URL): RequestInfo | URL {
     return input;
   }
   return `${apiBaseUrl}${input}`;
-}
-
-function normalizeApiBaseUrl(value: unknown) {
-  if (typeof value !== 'string') {
-    return '';
-  }
-  return value.trim().replace(/\/$/, '');
 }
 
 async function getErrorMessage(response: Response, fallbackMessage: string) {

@@ -1,6 +1,6 @@
 # Personal Accounting App
 
-個人記帳 Web App，用來快速記錄收入與支出，並透過首頁摘要、最近明細、歷史查詢與現金流趨勢，查看自己的消費與收入狀況。
+個人記帳 Web App，用來快速記錄收入與支出，並透過首頁摘要、今日明細、歷史查詢與現金流趨勢，查看自己的消費與收入狀況。
 
 <p align="center">
   <img src="./個人記帳的瀏覽圖.png" alt="個人記帳系統歷史查看頁面截圖">
@@ -23,7 +23,7 @@ Vue 3 前端
 - Google 登入與登出。
 - 依使用者隔離個人帳目。
 - 批次新增收入與支出。
-- 首頁查看本月類別摘要、甜甜圈圖與最近明細。
+- 首頁查看本月類別摘要、甜甜圈圖與今日明細。
 - 歷史查看依日期區間查詢帳目。
 - 歷史查看支援類別分布與年度現金流趨勢。
 - 在歷史查看頁編輯與刪除單筆帳目。
@@ -72,6 +72,8 @@ cd worker
 npm run dev:local
 ```
 
+`dev:local` 會載入專案根目錄 `.env`，供 Worker 取得 Firebase 與 Supabase 設定。
+
 啟動前端：
 
 ```powershell
@@ -79,6 +81,8 @@ cd frontend
 $env:VITE_API_PROXY_TARGET='http://localhost:8787'
 npm run dev -- --host localhost
 ```
+
+本機 dev 模式會走 `/api` proxy；即使 `.env` 內有正式環境的 `VITE_API_BASE_URL`，也不會在 dev 模式直接打部署 API。
 
 開啟：
 

@@ -41,6 +41,12 @@ interface FakeTransactionRow {
   created_at: string;
 }
 
+interface FakeSupabaseTransactionRow extends FakeTransactionRow {
+  categories: {
+    name: string;
+  };
+}
+
 class FakePreparedStatement {
   private readonly database: FakeD1Database;
   private readonly sql: string;
@@ -292,6 +298,58 @@ class FakeD1Database {
   }
 }
 
+class FakeSupabaseTransactionQuery {
+  private rows: FakeSupabaseTransactionRow[];
+  private from = 0;
+  private to: number | null = null;
+  private orderBy: keyof FakeSupabaseTransactionRow | null = null;
+
+  constructor(rows: FakeSupabaseTransactionRow[]) {
+    this.rows = rows;
+  }
+
+  select() {
+    return this;
+  }
+
+  eq(fieldName: keyof FakeSupabaseTransactionRow, value: unknown) {
+    this.rows = this.rows.filter((row) => row[fieldName] === value);
+    return this;
+  }
+
+  gte(fieldName: keyof FakeSupabaseTransactionRow, value: unknown) {
+    this.rows = this.rows.filter((row) => String(row[fieldName]) >= String(value));
+    return this;
+  }
+
+  lte(fieldName: keyof FakeSupabaseTransactionRow, value: unknown) {
+    this.rows = this.rows.filter((row) => String(row[fieldName]) <= String(value));
+    return this;
+  }
+
+  order(fieldName: keyof FakeSupabaseTransactionRow, options: { ascending: boolean }) {
+    this.orderBy = fieldName;
+    this.rows = [...this.rows].sort((left, right) => {
+      const result = String(left[fieldName]).localeCompare(String(right[fieldName]));
+      return options.ascending ? result : -result;
+    });
+    return this;
+  }
+
+  range(from: number, to: number) {
+    this.from = from;
+    this.to = to;
+    return this;
+  }
+
+  then<TResult>(
+    resolve: (value: { data: FakeSupabaseTransactionRow[]; error: null }) => TResult
+  ) {
+    const selectedRows = this.to === null ? this.rows : this.rows.slice(this.from, this.to + 1);
+    return Promise.resolve(resolve({ data: selectedRows, error: null }));
+  }
+}
+
 const user: AuthenticatedUser = {
   userId: 'firebase-user-1',
   email: 'user@example.test'
@@ -306,23 +364,20 @@ test('validateBatchCreateRequest rejects empty batch', () => {
   );
 });
 
-test('validateBatchCreateRequest rejects future date', () => {
-  assert.throws(
-    () => validateBatchCreateRequest({
-      transactions: [{
-        type: 'EXPENSE',
-        transactionDate: '2026-05-03',
-        amount: 100,
-        categoryName: '飲食'
-      }]
-    }, fixedNow),
-    (error: unknown) => error instanceof RangeError && error.message === 'Transaction 1 date cannot be in the future'
-  );
+test('validateBatchCreateRequest accepts future date', () => {
+  const transactions = validateBatchCreateRequest({
+    transactions: [{
+      type: 'EXPENSE',
+      transactionDate: '2026-05-03',
+      amount: 100,
+      categoryName: '飲食'
+    }]
+  }, fixedNow);
+
+  assert.equal(transactions[0].transactionDate, '2026-05-03');
 });
 
-test('validateBatchCreateRequest uses Asia Taipei date for today validation', () => {
-  const taipeiTodayWhenUtcIsPreviousDay = new Date('2026-05-04T16:30:00.000Z');
-
+test('validateBatchCreateRequest preserves valid date value', () => {
   const transactions = validateBatchCreateRequest({
     transactions: [{
       type: 'EXPENSE',
@@ -330,7 +385,7 @@ test('validateBatchCreateRequest uses Asia Taipei date for today validation', ()
       amount: 100,
       categoryName: '飲食'
     }]
-  }, taipeiTodayWhenUtcIsPreviousDay);
+  }, fixedNow);
 
   assert.equal(transactions[0].transactionDate, '2026-05-05');
 });
@@ -531,27 +586,8 @@ test('createBatchTransactions validates entire batch before writes', async () =>
   assert.equal(database.batchSize, 0);
 });
 
-test('listRecentTransactions returns current user rows ordered by created time', async () => {
-  const database = new FakeD1Database([
-    {
-      id: 'default-food',
-      user_id: null,
-      type: 'EXPENSE',
-      name: '飲食',
-      default_category: 1,
-      created_at: fixedNow.toISOString()
-    },
-    {
-      id: 'default-salary',
-      user_id: null,
-      type: 'INCOME',
-      name: '薪資',
-      default_category: 1,
-      created_at: fixedNow.toISOString()
-    }
-  ]);
-
-  database.transactions.push(
+test('listRecentTransactions returns today rows ordered by category', async () => {
+  const rows = [
     {
       id: 'older-transaction',
       user_id: 'firebase-user-1',
@@ -560,7 +596,8 @@ test('listRecentTransactions returns current user rows ordered by created time',
       amount: 120,
       category_id: 'default-food',
       note: 'older',
-      created_at: '2026-05-02T07:00:00.000Z'
+      created_at: '2026-05-02T10:00:00.000Z',
+      categories: { name: '飲食' }
     },
     {
       id: 'hidden-transaction',
@@ -570,7 +607,19 @@ test('listRecentTransactions returns current user rows ordered by created time',
       amount: 999,
       category_id: 'default-food',
       note: 'hidden',
-      created_at: '2026-05-02T09:00:00.000Z'
+      created_at: '2026-05-02T09:00:00.000Z',
+      categories: { name: '飲食' }
+    },
+    {
+      id: 'today-food',
+      user_id: 'firebase-user-1',
+      type: 'EXPENSE',
+      transaction_date: '2026-05-02',
+      amount: 90,
+      category_id: 'default-food',
+      note: 'today food',
+      created_at: '2026-05-02T07:00:00.000Z',
+      categories: { name: '飲食' }
     },
     {
       id: 'newer-transaction',
@@ -580,13 +629,26 @@ test('listRecentTransactions returns current user rows ordered by created time',
       amount: 3000,
       category_id: 'default-salary',
       note: null,
-      created_at: '2026-05-02T08:00:00.000Z'
+      created_at: '2026-05-02T08:00:00.000Z',
+      categories: { name: '薪資' }
     }
-  );
+  ];
+  const supabase = {
+    from: () => new FakeSupabaseTransactionQuery(rows)
+  };
 
-  const transactions = await listRecentTransactions(database as unknown as D1Database, user, 2);
+  const transactions = await listRecentTransactions(supabase as unknown as D1Database, user, 2, fixedNow);
 
   assert.deepEqual(transactions, [
+    {
+      id: 'today-food',
+      type: 'EXPENSE',
+      transactionDate: '2026-05-02',
+      amount: 90,
+      categoryName: '飲食',
+      note: 'today food',
+      createdAt: '2026-05-02T07:00:00.000Z'
+    },
     {
       id: 'newer-transaction',
       type: 'INCOME',
@@ -595,15 +657,6 @@ test('listRecentTransactions returns current user rows ordered by created time',
       categoryName: '薪資',
       note: null,
       createdAt: '2026-05-02T08:00:00.000Z'
-    },
-    {
-      id: 'older-transaction',
-      type: 'EXPENSE',
-      transactionDate: '2026-05-01',
-      amount: 120,
-      categoryName: '飲食',
-      note: 'older',
-      createdAt: '2026-05-02T07:00:00.000Z'
     }
   ]);
 });

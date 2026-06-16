@@ -1,5 +1,6 @@
 .env
 frontend/.env*
+.codegraph/
 
 # Java / Maven
 backend/target/

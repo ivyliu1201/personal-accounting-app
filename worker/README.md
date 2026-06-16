@@ -4,9 +4,9 @@ Worker API 保留原本路由，資料庫改為 Supabase Postgres。
 
 ## Required Secrets
 
-設定在 Cloudflare Worker（local 可放 `worker/.dev.vars`）：
+設定在 Cloudflare Worker。Local 預設由 `npm run dev:local` 載入專案根目錄 `.env`：
 
-- `FIREBASE_PROJECT_ID`
+- `FIREBASE_PROJECT_ID` 或 `VITE_FIREBASE_PROJECT_ID`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
@@ -17,6 +17,8 @@ cd worker
 npm install
 npm run dev:local
 ```
+
+`dev:local` 會執行 `wrangler dev --local --port 8787 --env-file ../.env`，避免把 Supabase service role key 複製到 `worker/.dev.vars`。
 
 ## Deploy
 

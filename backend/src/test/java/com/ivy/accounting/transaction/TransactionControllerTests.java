@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 交易 API 整合測試，驗證首頁批次新增與最近明細 API 的 HTTP 行為。
+ * 交易 API 整合測試，驗證首頁批次新增與今日明細 API 的 HTTP 行為。
  */
 @SpringBootTest
 class TransactionControllerTests {
@@ -104,15 +104,17 @@ class TransactionControllerTests {
     }
 
     @Test
-    void listRecentReturnsRequestedLimit() throws Exception {
-        createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "第一筆");
-        createTransaction("EXPENSE", "2026-04-28", 90, "交通", "第二筆");
-        createTransaction("EXPENSE", "2026-04-29", 100, "運動", "第三筆");
+    void listRecentReturnsTodayRowsOrderedByCategory() throws Exception {
+        createTransaction("EXPENSE", "2026-04-28", 80, "A類", "非今日");
+        createTransaction("EXPENSE", "2026-04-29", 90, "B類", "今日第二類");
+        createTransaction("EXPENSE", "2026-04-29", 100, "A類", "今日第一類");
 
         mockMvc.perform(get("/api/transactions/recent")
                         .param("limit", "2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].categoryName").value("A類"))
+                .andExpect(jsonPath("$[1].categoryName").value("B類"));
     }
 
     @Test
@@ -172,7 +174,7 @@ class TransactionControllerTests {
     }
 
     @Test
-    void updateTransactionRejectsFutureDate() throws Exception {
+    void updateTransactionAcceptsFutureDate() throws Exception {
         String transactionId = createTransaction("EXPENSE", "2026-04-27", 80, "飲食", "before");
         String requestBody = """
                 {
@@ -187,7 +189,13 @@ class TransactionControllerTests {
         mockMvc.perform(put("/api/transactions/{id}", transactionId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionDate").value("2999-01-01"));
+
+        AccountingTransaction updatedTransaction = transactionRepository
+                .findById(UUID.fromString(transactionId))
+                .orElseThrow();
+        assertThat(updatedTransaction.getTransactionDate()).hasToString("2999-01-01");
     }
 
     @Test
@@ -414,7 +422,7 @@ class TransactionControllerTests {
     }
 
     @Test
-    void createBatchRejectsFutureDate() throws Exception {
+    void createBatchAcceptsFutureDate() throws Exception {
         String requestBody = """
                 {
                   "transactions": [
@@ -432,9 +440,10 @@ class TransactionControllerTests {
         mockMvc.perform(post("/api/transactions/batch")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactions[0].transactionDate").value("2999-01-01"));
 
-        assertThat(transactionRepository.findAll()).isEmpty();
+        assertThat(transactionRepository.findAll()).hasSize(1);
     }
 
     @Test
@@ -462,7 +471,7 @@ class TransactionControllerTests {
     }
 
     /**
-     * 透過 API 建立支出資料，讓最近明細測試不直接依賴 Service 實作細節。
+     * 透過 API 建立支出資料，讓今日明細測試不直接依賴 Service 實作細節。
      *
      * 輸入：日期、金額、類別與備註。
      * 輸出：無，成功後資料會寫入測試資料庫。

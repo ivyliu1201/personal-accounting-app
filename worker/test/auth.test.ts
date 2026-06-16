@@ -68,3 +68,24 @@ test('authenticateFirebaseRequest passes token and project id to verifier', asyn
 
   assert.deepEqual(user, expectedUser);
 });
+
+test('authenticateFirebaseRequest falls back to Vite Firebase project id', async () => {
+  const request = new Request('https://example.test/api/auth/me', {
+    headers: {
+      Authorization: 'Bearer test-token'
+    }
+  });
+  const expectedUser: AuthenticatedUser = {
+    userId: 'firebase-user-1',
+    email: 'user@example.test'
+  };
+  const verifier: FirebaseTokenVerifier = async (idToken, projectId) => {
+    assert.equal(idToken, 'test-token');
+    assert.equal(projectId, 'demo-project');
+    return expectedUser;
+  };
+
+  const user = await authenticateFirebaseRequest(request, { VITE_FIREBASE_PROJECT_ID: 'demo-project' }, verifier);
+
+  assert.deepEqual(user, expectedUser);
+});

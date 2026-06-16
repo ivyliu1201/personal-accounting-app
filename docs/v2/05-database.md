@@ -49,7 +49,7 @@ MVP 的資料模型刻意保持精簡：
 - `amount` 必須大於 0。
 - 每筆帳目屬於一位使用者。
 - 查詢必須包含目前使用者範圍。
-- 首頁最近明細依 `created_at desc` 排序。
+- 首頁今日明細以 `transaction_date` 篩選今天資料，並依類別名稱排序；同類別內依 `created_at desc` 排序。
 - 歷史查看列表依 `transaction_date desc`，再依 `created_at desc` 排序。
 
 ## 4. 預設類別

@@ -15,7 +15,18 @@ import java.util.UUID;
 public interface AccountingTransactionRepository extends JpaRepository<AccountingTransaction, UUID> {
 
     @EntityGraph(attributePaths = "category")
-    List<AccountingTransaction> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
+    @Query("""
+            select t
+            from AccountingTransaction t
+            where t.userId = :userId
+              and t.transactionDate = :transactionDate
+            order by t.category.name asc, t.createdAt desc
+            """)
+    List<AccountingTransaction> listTodayTransactions(
+            @Param("userId") String userId,
+            @Param("transactionDate") LocalDate transactionDate,
+            Pageable pageable
+    );
 
     @EntityGraph(attributePaths = "category")
     Optional<AccountingTransaction> findByIdAndUserId(UUID id, String userId);

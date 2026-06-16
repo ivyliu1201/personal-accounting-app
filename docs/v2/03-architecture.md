@@ -28,7 +28,7 @@
 - 建置工具：Vite。
 - 登入用戶端：Firebase Web SDK。
 - 主要 API 呼叫慣例：`/api/...`。
-- 正式環境 API base URL 由 `VITE_API_BASE_URL` 設定。
+- 正式環境 API base URL 由 `VITE_API_BASE_URL` 設定；本機 dev 模式固定走 Vite `/api` proxy。
 
 職責：
 
@@ -37,7 +37,7 @@
 - 在受保護 API 請求中附上 Firebase ID token。
 - 在送出前執行基本表單完整性檢查。
 - 顯示 loading、成功、失敗與空狀態。
-- 呈現甜甜圈圖、摘要表、最近明細、歷史明細與年度現金流趨勢。
+- 呈現甜甜圈圖、摘要表、今日明細、歷史明細與年度現金流趨勢。
 
 ### 2.2 Worker API
 

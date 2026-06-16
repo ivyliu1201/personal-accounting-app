@@ -198,14 +198,19 @@ export async function listHistoryTransactions(
 export async function listRecentTransactions(
   supabase: SupabaseClient,
   user: AuthenticatedUser,
-  limit: number
+  limit: number,
+  today = new Date()
 ): Promise<TransactionResponse[]> {
+  const todayText = formatAppDate(today);
   const rows = await selectTransactions(supabase, user, {
-    from: 0,
-    to: limit - 1,
-    orderByCreatedAtDesc: true
+    startDate: todayText,
+    endDate: todayText
   });
-  return rows.map(transactionRowToResponse);
+  return rows
+    .map(transactionRowToResponse)
+    .sort((left, right) => left.categoryName.localeCompare(right.categoryName, 'zh-Hant')
+      || right.createdAt.localeCompare(left.createdAt))
+    .slice(0, limit);
 }
 
 export async function updateTransaction(
@@ -585,10 +590,6 @@ function validateTransactionDate(transactionDate: unknown, index: number, now: D
     throw new RangeError(`Transaction ${index + 1} date is invalid`);
   }
   validateDateValue(transactionDate, `Transaction ${index + 1} date`);
-  const today = formatAppDate(now);
-  if (transactionDate > today) {
-    throw new RangeError(`Transaction ${index + 1} date cannot be in the future`);
-  }
   return transactionDate;
 }
 

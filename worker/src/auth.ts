@@ -3,6 +3,7 @@ import type { JWTPayload } from 'jose';
 
 export interface WorkerEnv {
   FIREBASE_PROJECT_ID?: string;
+  VITE_FIREBASE_PROJECT_ID?: string;
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   APP_CORS_ALLOWED_ORIGINS?: string;
@@ -102,7 +103,7 @@ export async function verifyFirebaseToken(idToken: string, projectId: string): P
  * 可能錯誤：未設定時拋出 AuthError。
  */
 function getRequiredFirebaseProjectId(env: WorkerEnv): string {
-  const projectId = env.FIREBASE_PROJECT_ID?.trim();
+  const projectId = env.FIREBASE_PROJECT_ID?.trim() || env.VITE_FIREBASE_PROJECT_ID?.trim();
   if (!projectId) {
     throw new AuthError('Firebase project id is not configured');
   }

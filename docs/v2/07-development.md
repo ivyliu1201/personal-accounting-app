@@ -41,6 +41,8 @@ cd worker
 npm run dev:local
 ```
 
+`dev:local` 會載入專案根目錄 `.env`，供 Worker 取得 Firebase project id 與 Supabase 設定。
+
 預期本機 Worker URL：
 
 ```text
@@ -56,6 +58,8 @@ cd frontend
 $env:VITE_API_PROXY_TARGET='http://localhost:8787'
 npm run dev -- --host localhost
 ```
+
+Dev 模式會忽略 `.env` 中的 `VITE_API_BASE_URL`，確保本機操作打到 `VITE_API_PROXY_TARGET` 指定的 Worker。
 
 預期前端 URL：
 

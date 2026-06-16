@@ -69,7 +69,8 @@ public class TransactionService {
     public List<AccountingTransaction> listRecent(Integer requestedLimit) {
         String userId = getCurrentUserId();
         int limit = normalizeRecentLimit(requestedLimit);
-        return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
+        LocalDate today = LocalDate.now(clock);
+        return transactionRepository.listTodayTransactions(userId, today, PageRequest.of(0, limit));
     }
 
     @Transactional
