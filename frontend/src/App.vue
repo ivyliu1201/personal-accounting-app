@@ -214,38 +214,60 @@
             </select>
             <input v-model="historyStartDate" type="date" aria-label="開始日期" @change="resetHistoryPageAndLoad" />
             <input v-model="historyEndDate" type="date" aria-label="結束日期" @change="resetHistoryPageAndLoad" />
-            <select v-model.number="historySize" aria-label="每頁筆數" @change="resetHistoryPageAndLoad">
+          </div>
+        </div>
+
+        <div class="panel-header history-record-header">
+          <div class="history-record-title">
+            <h2>{{ historyRecordTitle }}</h2>
+            <select
+              v-if="historyDetailsExpanded"
+              v-model.number="historySize"
+              class="recent-limit-select history-size-select"
+              aria-label="歷史紀錄筆數"
+              @change="resetHistoryPageAndLoad"
+            >
               <option :value="10">10 筆</option>
               <option :value="15">15 筆</option>
               <option :value="20">20 筆</option>
             </select>
           </div>
-        </div>
-
-        <TransactionsTable
-          :transactions="historyTransactions"
-          :loading="isLoadingHistory"
-          empty-label="查詢區間沒有資料"
-          :show-actions="true"
-          @delete="openDeleteDialog"
-          @edit="openEditDialog"
-        />
-
-        <div class="pager">
-          <button type="button" :disabled="historyPage === 0 || isLoadingHistory" @click="previousHistoryPage">
-            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M15 6 9 12l6 6" />
-            </svg>
-            上一頁
-          </button>
-          <span>第 {{ historyPage + 1 }} 頁</span>
-          <button type="button" :disabled="!historyHasNext || isLoadingHistory" @click="nextHistoryPage">
-            下一頁
-            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m9 6 6 6-6 6" />
-            </svg>
+          <button
+            type="button"
+            class="compact-toggle"
+            :aria-expanded="historyDetailsExpanded"
+            @click="historyDetailsExpanded = !historyDetailsExpanded"
+          >
+            {{ historyDetailsExpanded ? '收合' : '查看' }}
           </button>
         </div>
+
+        <template v-if="historyDetailsExpanded">
+          <TransactionsTable
+            :transactions="historyTransactions"
+            :loading="isLoadingHistory"
+            empty-label="查詢區間沒有資料"
+            :show-actions="true"
+            @delete="openDeleteDialog"
+            @edit="openEditDialog"
+          />
+
+          <div class="pager">
+            <button type="button" :disabled="historyPage === 0 || isLoadingHistory" @click="previousHistoryPage">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 6 9 12l6 6" />
+              </svg>
+              上一頁
+            </button>
+            <span>第 {{ historyPage + 1 }} 頁</span>
+            <button type="button" :disabled="!historyHasNext || isLoadingHistory" @click="nextHistoryPage">
+              下一頁
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+        </template>
       </section>
 
       <aside class="history-side-panel">
@@ -624,6 +646,7 @@ const historySummaryMode = ref<SummaryMode>('EXPENSE');
 const summaryDetailsExpanded = ref(false);
 const historySummaryDetailsExpanded = ref(false);
 const recentDetailsExpanded = ref(false);
+const historyDetailsExpanded = ref(false);
 const isSubmitting = ref(false);
 const isLoadingRecent = ref(false);
 const isLoadingHistory = ref(false);
@@ -659,6 +682,7 @@ const historyTrendYear = computed(() => Number(historyStartDate.value.slice(0, 4
 const summaryPeriodLabel = computed(() => formatRangeLabel(defaultMonthStartDate, today));
 const historyPeriodLabel = computed(() => formatRangeLabel(historyStartDate.value, historyEndDate.value));
 const historyTrendLabel = computed(() => `${historyTrendYear.value} 年每月總現金流與累積總現金流`);
+const historyRecordTitle = computed(() => `${typeLabel(historyType.value)}明細`);
 const currentUserDisplayName = computed(() => currentUser.value?.displayName || currentUser.value?.email || '已登入');
 
 const activeSummaryRows = computed(() => getSummaryRows(

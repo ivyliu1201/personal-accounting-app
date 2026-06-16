@@ -1028,12 +1028,23 @@ td[colspan] {
   gap: 10px;
 }
 
-.today-record-title {
+.today-record-title,
+.history-record-title {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.history-record-header {
+  gap: 10px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+
+.history-size-select {
+  min-width: 70px;
 }
 
 .recent-limit-select {
@@ -1988,11 +1999,19 @@ td[colspan] {
     justify-content: space-between;
   }
 
-  .today-record-title {
+  .history-record-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .today-record-title,
+  .history-record-title {
     flex-wrap: wrap;
   }
 
-  .recent-limit-select {
+  .recent-limit-select,
+  .history-size-select {
     width: auto;
     max-width: 92px;
   }
