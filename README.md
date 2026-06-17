@@ -40,6 +40,8 @@ Vue 3 前端
 | Database | Supabase Postgres |
 | Deploy | Cloudflare Pages, Cloudflare Workers |
 
+前端部署採 Cloudflare Pages GitHub integration：push 到 GitHub `master` 後由 Cloudflare Pages 自動 build 與部署。Pages 專案設定請參考 [`docs/v2/09-deployment.md`](./docs/v2/09-deployment.md)。
+
 ## 專案結構
 
 ```text

@@ -2,7 +2,7 @@
 
 ## 1. 部署目標
 
-- 前端：Cloudflare Pages。
+- 前端：Cloudflare Pages，透過 GitHub integration 從 `master` push 自動部署。
 - 後端 API：Cloudflare Worker。
 - 資料庫：Supabase Postgres。
 - 登入驗證：Firebase Authentication。
@@ -29,7 +29,24 @@ npm run deploy
 
 ## 3. 前端部署
 
-Build 前需依 `06-env.md` 設定前端環境變數，至少包含：
+前端正式部署主線使用 Cloudflare Pages GitHub integration。
+
+GitHub repository：
+
+```text
+https://github.com/ivyliu1201/personal-accounting-app
+```
+
+Cloudflare Pages 設定：
+
+| 項目 | 值 |
+|---|---|
+| Production branch | `master` |
+| Root directory | `frontend` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+Cloudflare Pages 環境變數需依 `06-env.md` 設定，至少包含：
 
 ```text
 VITE_API_BASE_URL=https://<worker-domain>
@@ -41,14 +58,16 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=<firebase-sender-id>
 VITE_FIREBASE_APP_ID=<firebase-app-id>
 ```
 
-Build：
+設定完成後，push 到 GitHub `master` branch 會由 Cloudflare Pages 自動執行 build 與部署。
+
+本機部署前驗證仍可執行：
 
 ```powershell
 cd frontend
 npm run build
 ```
 
-將 `frontend/dist` 部署到 Cloudflare Pages。
+除非 Cloudflare Pages GitHub integration 暫時不可用，否則不使用 Wrangler direct upload 作為正式前端部署主線。
 
 ## 4. Firebase 設定
 
