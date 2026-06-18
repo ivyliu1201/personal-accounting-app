@@ -1,9 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AuthenticatedUser } from './auth';
 import type { TransactionType } from './categories';
+import {
+  buildAiQuickAddFeedbackRow,
+  type AiSuggestionMetadata
+} from './aiFeedback';
 
 interface BatchCreateTransactionsRequest {
   transactions?: CreateTransactionRequest[];
+  quickAddSessionId?: unknown;
+  quickAddInputText?: unknown;
 }
 
 interface CreateTransactionRequest {
@@ -12,6 +18,7 @@ interface CreateTransactionRequest {
   amount?: unknown;
   categoryName?: string;
   note?: string | null;
+  aiSuggestion?: unknown;
 }
 
 type UpdateTransactionRequest = CreateTransactionRequest;
@@ -22,6 +29,12 @@ interface ValidatedCreateTransaction {
   amount: number;
   categoryName: string;
   note: string | null;
+  aiSuggestion?: AiSuggestionMetadata;
+}
+
+interface QuickAddBatchMetadata {
+  quickAddSessionId?: string;
+  quickAddInputText?: string;
 }
 
 export interface TransactionResponse {
@@ -147,7 +160,9 @@ export async function listAnnualCashFlowTrend(
   }
 
   const startDate = `${year}-01-01`;
-  const endDate = `${year}-${String(endMonth).padStart(2, '0')}-${getMonthLastDay(year, endMonth)}`;
+  const endDate = year === todayYear
+    ? todayText
+    : `${year}-${String(endMonth).padStart(2, '0')}-${getMonthLastDay(year, endMonth)}`;
   const transactions = await selectTransactions(supabase, user, { startDate, endDate });
   const amountByLabel = new Map<string, number>();
   for (const row of transactions) {
@@ -470,8 +485,13 @@ export async function createBatchTransactions(
   now = new Date()
 ): Promise<BatchCreateTransactionsResponse> {
   const transactions = validateBatchCreateRequest(body, now);
+  const quickAddMetadata = validateQuickAddBatchMetadata(body);
   const createdAt = now.toISOString();
   const responses: TransactionResponse[] = [];
+  const createdFeedbackRequests: Array<{
+    transactionId: string;
+    transaction: ValidatedCreateTransaction;
+  }> = [];
   for (const transaction of transactions) {
     const categoryId = await getOrCreateCategoryId(supabase, user, transaction.type, transaction.categoryName, createdAt);
     const transactionId = crypto.randomUUID();
@@ -490,6 +510,7 @@ export async function createBatchTransactions(
     if (error) {
       throw error;
     }
+    createdFeedbackRequests.push({ transactionId, transaction });
     responses.push({
       id: transactionId,
       type: transaction.type,
@@ -499,6 +520,16 @@ export async function createBatchTransactions(
       note: transaction.note,
       createdAt: createdAt
     });
+  }
+  for (const feedbackRequest of createdFeedbackRequests) {
+    await insertAiQuickAddFeedback(
+      supabase,
+      user,
+      feedbackRequest.transactionId,
+      feedbackRequest.transaction,
+      quickAddMetadata,
+      createdAt
+    );
   }
   return { transactions: responses };
 }
@@ -575,7 +606,132 @@ function validateTransactionPayload(
   const amount = validateAmount(transaction.amount, index);
   const categoryName = validateCategoryName(transaction.categoryName, index);
   const note = validateNote(transaction.note, index);
-  return { type, transactionDate, amount, categoryName, note };
+  const validatedTransaction: ValidatedCreateTransaction = { type, transactionDate, amount, categoryName, note };
+  const aiSuggestion = validateAiSuggestionMetadata(transaction.aiSuggestion, index);
+  if (aiSuggestion) {
+    validatedTransaction.aiSuggestion = aiSuggestion;
+  }
+  return validatedTransaction;
+}
+
+function validateQuickAddBatchMetadata(body: unknown): QuickAddBatchMetadata {
+  if (!isRecord(body)) {
+    return {};
+  }
+  const metadata: QuickAddBatchMetadata = {};
+  if (typeof body.quickAddSessionId === 'string' && body.quickAddSessionId.trim() !== '') {
+    metadata.quickAddSessionId = body.quickAddSessionId.trim();
+  }
+  if (typeof body.quickAddInputText === 'string' && body.quickAddInputText.trim() !== '') {
+    metadata.quickAddInputText = body.quickAddInputText.trim();
+  }
+  return metadata;
+}
+
+function validateAiSuggestionMetadata(aiSuggestion: unknown, index: number): AiSuggestionMetadata | undefined {
+  if (aiSuggestion === undefined || aiSuggestion === null) {
+    return undefined;
+  }
+  if (!isRecord(aiSuggestion)) {
+    throw new RangeError(`Transaction ${index + 1} AI suggestion is invalid`);
+  }
+  const modelType = validateAiSuggestionType(aiSuggestion.modelType, index);
+  const mappedType = validateAiSuggestionType(aiSuggestion.mappedType, index);
+  return {
+    suggestionId: validateAiSuggestionString(aiSuggestion.suggestionId, index, 'suggestionId'),
+    sourceText: validateAiSuggestionString(aiSuggestion.sourceText, index, 'sourceText'),
+    itemText: validateAiSuggestionString(aiSuggestion.itemText, index, 'itemText'),
+    modelLabel: validateAiSuggestionString(aiSuggestion.modelLabel, index, 'modelLabel'),
+    modelType,
+    modelCategory: validateAiSuggestionString(aiSuggestion.modelCategory, index, 'modelCategory'),
+    mappedType,
+    mappedCategoryName: validateAiSuggestionString(aiSuggestion.mappedCategoryName, index, 'mappedCategoryName'),
+    suggestedTransactionDate: validateAiSuggestionDate(aiSuggestion.suggestedTransactionDate, index),
+    suggestedAmount: validateAiSuggestionAmount(aiSuggestion.suggestedAmount, index),
+    suggestedNote: validateAiSuggestionNote(aiSuggestion.suggestedNote, index),
+    confidence: validateAiSuggestionConfidence(aiSuggestion.confidence, index),
+    needsReview: validateAiSuggestionBoolean(aiSuggestion.needsReview, index, 'needsReview'),
+    dateSource: validateAiSuggestionString(aiSuggestion.dateSource, index, 'dateSource'),
+    mappingSource: validateAiSuggestionString(aiSuggestion.mappingSource, index, 'mappingSource')
+  };
+}
+
+function validateAiSuggestionType(value: unknown, index: number): TransactionType {
+  if (value === 'INCOME' || value === 'EXPENSE') {
+    return value;
+  }
+  throw new RangeError(`Transaction ${index + 1} AI suggestion type is invalid`);
+}
+
+function validateAiSuggestionString(value: unknown, index: number, fieldName: string): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new RangeError(`Transaction ${index + 1} AI suggestion ${fieldName} is invalid`);
+  }
+  return value.trim();
+}
+
+function validateAiSuggestionDate(value: unknown, index: number): string {
+  if (typeof value !== 'string') {
+    throw new RangeError(`Transaction ${index + 1} AI suggestion date is invalid`);
+  }
+  return validateDateValue(value, `Transaction ${index + 1} AI suggestion date`);
+}
+
+function validateAiSuggestionAmount(value: unknown, index: number): number {
+  const amount = typeof value === 'string' ? Number(value) : value;
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    throw new RangeError(`Transaction ${index + 1} AI suggestion amount is invalid`);
+  }
+  return amount;
+}
+
+function validateAiSuggestionConfidence(value: unknown, index: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new RangeError(`Transaction ${index + 1} AI suggestion confidence is invalid`);
+  }
+  return value;
+}
+
+function validateAiSuggestionBoolean(value: unknown, index: number, fieldName: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new RangeError(`Transaction ${index + 1} AI suggestion ${fieldName} is invalid`);
+  }
+  return value;
+}
+
+function validateAiSuggestionNote(value: unknown, index: number): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    throw new RangeError(`Transaction ${index + 1} AI suggestion note is invalid`);
+  }
+  return value.trim() === '' ? null : value.trim();
+}
+
+async function insertAiQuickAddFeedback(
+  supabase: SupabaseClient,
+  user: AuthenticatedUser,
+  transactionId: string,
+  transaction: ValidatedCreateTransaction,
+  quickAddMetadata: QuickAddBatchMetadata,
+  createdAt: string
+): Promise<void> {
+  const row = buildAiQuickAddFeedbackRow({
+    id: crypto.randomUUID(),
+    userId: user.userId,
+    transactionId,
+    quickAddSessionId: quickAddMetadata.quickAddSessionId,
+    quickAddInputText: quickAddMetadata.quickAddInputText,
+    transaction,
+    createdAt
+  });
+  if (!row) {
+    return;
+  }
+  await supabase
+    .from('ai_quick_add_feedback')
+    .insert(row);
 }
 
 function validateType(type: unknown, index: number): TransactionType {

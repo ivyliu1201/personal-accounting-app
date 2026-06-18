@@ -7,6 +7,8 @@ export interface WorkerEnv {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   APP_CORS_ALLOWED_ORIGINS?: string;
+  AI_CATEGORY_SERVICE_URL?: string;
+  AI_CATEGORY_SERVICE_TOKEN?: string;
 }
 
 export interface AuthenticatedUser {

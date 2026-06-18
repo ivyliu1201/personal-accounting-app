@@ -83,7 +83,65 @@ Cache-Control: no-store
 ]
 ```
 
-## 5. 批次新增帳目
+## 5. AI 快速新增解析
+
+### `POST /api/ai/quick-add/parse`
+
+用途：將自然語句解析為可代入批次新增表單的帳目建議。
+
+需要登入：是。
+
+請求內容：
+
+```json
+{
+  "text": "昨天早餐100 6/18 捷運30"
+}
+```
+
+回應內容：
+
+```json
+{
+  "suggestions": [
+    {
+      "suggestionId": "uuid",
+      "sourceText": "昨天早餐100",
+      "itemText": "早餐",
+      "type": "EXPENSE",
+      "transactionDate": "2026-06-16",
+      "amount": 100,
+      "categoryName": "飲食",
+      "customCategoryName": null,
+      "needsReview": false,
+      "confidence": 0.91,
+      "modelLabel": "expense::飲食",
+      "modelType": "EXPENSE",
+      "modelCategory": "飲食",
+      "mappedType": "EXPENSE",
+      "mappedCategoryName": "飲食",
+      "suggestedTransactionDate": "2026-06-16",
+      "suggestedAmount": 100,
+      "suggestedNote": "早餐",
+      "mappingSource": "exact_match",
+      "dateSource": "relative_date"
+    }
+  ],
+  "unparsedItems": []
+}
+```
+
+規則：
+
+- 前端不得直接呼叫 AI 服務，需透過本 route。
+- Worker 需先驗證 Firebase token。
+- 沒有日期時使用應用日期基準的今天。
+- 類別需先轉成目前使用者可用類別；無法對應時以自訂類別建議回傳。
+- `modelType`、`modelCategory`、`modelLabel` 保留 AI 模型原始判斷。
+- `mappedType`、`mappedCategoryName` 保留 Worker 對應到記帳系統後的結果，供送出帳目時回寫學習回饋。
+- `unparsedItems` 表示未能安全代入批次新增表單的文字片段。
+
+## 6. 批次新增帳目
 
 ### `POST /api/transactions/batch`
 
@@ -95,13 +153,32 @@ Cache-Control: no-store
 
 ```json
 {
+  "quickAddSessionId": "uuid",
+  "quickAddInputText": "昨天早餐100 買文具80",
   "transactions": [
     {
       "type": "EXPENSE",
       "transactionDate": "2026-05-05",
       "amount": 300,
       "categoryName": "飲食",
-      "note": "午餐"
+      "note": "午餐",
+      "aiSuggestion": {
+        "suggestionId": "uuid",
+        "sourceText": "昨天早餐100",
+        "itemText": "早餐",
+        "modelLabel": "expense::飲食",
+        "modelType": "EXPENSE",
+        "modelCategory": "飲食",
+        "mappedType": "EXPENSE",
+        "mappedCategoryName": "飲食",
+        "suggestedTransactionDate": "2026-06-16",
+        "suggestedAmount": 100,
+        "suggestedNote": "早餐",
+        "confidence": 0.91,
+        "needsReview": false,
+        "dateSource": "relative_date",
+        "mappingSource": "exact_match"
+      }
     }
   ]
 }
@@ -125,7 +202,15 @@ Cache-Control: no-store
 }
 ```
 
-## 6. 今日明細
+規則：
+
+- `quickAddSessionId` 與 `quickAddInputText` 僅在資料由快速新增代入時提供。
+- `aiSuggestion` 僅在該列由 AI 建議產生時提供。
+- 送出後若使用者修改 AI 代入列，Worker 會將 AI 建議與最終帳目寫入 `ai_quick_add_feedback`，標記為 `corrected`。
+- 同一快速新增 session 中，若使用者手動補上 AI 漏掉的列且該列沒有 `aiSuggestion`，Worker 會寫入 `missed_by_ai` 回饋。
+- 一般手動批次新增不需提供上述 AI 欄位，也不會產生 AI 回饋。
+
+## 7. 今日明細
 
 ### `GET /api/transactions/recent?limit=5`
 
@@ -158,7 +243,7 @@ Cache-Control: no-store
 ]
 ```
 
-## 7. 歷史明細
+## 8. 歷史明細
 
 ### `GET /api/transactions/history`
 
@@ -195,7 +280,7 @@ Cache-Control: no-store
 }
 ```
 
-## 8. 類別摘要
+## 9. 類別摘要
 
 ### `GET /api/transactions/category-summary`
 
@@ -226,7 +311,7 @@ Cache-Control: no-store
 ]
 ```
 
-## 9. 年度現金流趨勢
+## 10. 年度現金流趨勢
 
 ### `GET /api/transactions/cash-flow-trend?year=2026`
 
@@ -250,7 +335,7 @@ Cache-Control: no-store
 ]
 ```
 
-## 10. 更新帳目
+## 11. 更新帳目
 
 ### `PUT /api/transactions/{id}`
 
@@ -272,7 +357,7 @@ Cache-Control: no-store
 
 回應內容：`TransactionResponse`。
 
-## 11. 刪除帳目
+## 12. 刪除帳目
 
 ### `DELETE /api/transactions/{id}`
 

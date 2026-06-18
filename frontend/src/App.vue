@@ -73,13 +73,15 @@
               @input="normalizeAmount(row)"
             />
             <div class="category-field">
-              <select v-model="row.categoryName" aria-label="類別" @change="resetCustomCategory(row)">
-                <option value="">類別</option>
-                <option v-for="category in categoriesByType(row.type)" :key="category" :value="category">
-                  {{ category }}
-                </option>
-                <option v-if="row.type" :value="CUSTOM_CATEGORY_VALUE">自訂類別</option>
-              </select>
+              <CategorySelect
+                v-model="row.categoryName"
+                :allow-custom="Boolean(row.type)"
+                label="類別"
+                placeholder="類別"
+                :options="categoriesByType(row.type)"
+                @change="resetCustomCategory(row)"
+                @focus="scrollSelectIntoView"
+              />
               <input
                 v-if="row.categoryName === CUSTOM_CATEGORY_VALUE"
                 v-model.trim="row.customCategoryName"
@@ -111,6 +113,12 @@
               <path d="M12 5v14M5 12h14" />
             </svg>
             新增一列
+          </button>
+          <button type="button" @click="openQuickAddDialog">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8L12 3z" />
+            </svg>
+            快速新增
           </button>
           <button type="button" :disabled="!canSubmit || isSubmitting" @click="submitBatch">
             <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -390,6 +398,105 @@
       </aside>
     </section>
 
+    <div v-if="quickAddDialogOpen" class="modal-backdrop" role="presentation">
+      <section class="modal quick-add-modal" role="dialog" aria-modal="true" aria-label="快速新增">
+        <h2>快速新增</h2>
+        <div class="modal-form quick-add-form">
+          <div class="quick-add-input-row" :class="{ compact: quickAddSuggestions.length > 0 }">
+            <label>
+              <span>輸入內容</span>
+              <textarea
+                v-model.trim="quickAddText"
+                maxlength="1000"
+                placeholder="例如：昨天早餐100 6/18 捷運30"
+                aria-label="快速新增輸入內容"
+              ></textarea>
+            </label>
+            <button type="button" :disabled="!quickAddText || isParsingQuickAdd || isSubmittingQuickAdd" @click="parseQuickAdd">
+              {{ isParsingQuickAdd ? '解析中' : '解析' }}
+            </button>
+          </div>
+
+          <section v-if="quickAddSuggestions.length > 0" class="quick-add-preview" aria-label="解析預覽">
+            <h3>解析預覽</h3>
+            <ul>
+              <li v-for="suggestion in quickAddSuggestions" :key="suggestion.suggestionId" class="quick-add-suggestion-card">
+                <div class="quick-add-suggestion-head">
+                  <span>來源：{{ suggestion.sourceText }}</span>
+                  <mark v-if="suggestion.needsReview">需確認</mark>
+                </div>
+                <label class="quick-add-field">
+                  <span>日期</span>
+                  <input v-model="suggestion.transactionDate" type="date" aria-label="快速新增日期" />
+                </label>
+                <label class="quick-add-field">
+                  <span>類型</span>
+                  <select
+                    v-model="suggestion.type"
+                    aria-label="快速新增收入或支出"
+                    @change="resetQuickAddSuggestionCategory(suggestion)"
+                  >
+                    <option value="EXPENSE">支出</option>
+                    <option value="INCOME">收入</option>
+                  </select>
+                </label>
+                <label class="quick-add-field">
+                  <span>金額</span>
+                  <input
+                    v-model.number="suggestion.amount"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputmode="decimal"
+                    aria-label="快速新增金額"
+                  />
+                </label>
+                <div class="quick-add-field quick-add-field-category">
+                  <label>
+                    <span>類別</span>
+                    <CategorySelect
+                      v-model="suggestion.categoryName"
+                      allow-custom
+                      label="快速新增類別"
+                      placeholder="類別"
+                      :options="categoriesByType(suggestion.type)"
+                      @change="resetQuickAddSuggestionCustomCategory(suggestion)"
+                      @focus="scrollSelectIntoView"
+                    />
+                  </label>
+                  <input
+                    v-if="suggestion.categoryName === CUSTOM_CATEGORY_VALUE"
+                    v-model.trim="suggestion.customCategoryName"
+                    type="text"
+                    maxlength="64"
+                    placeholder="輸入自訂類別"
+                    aria-label="快速新增自訂類別"
+                  />
+                </div>
+                <label class="quick-add-field quick-add-field-note">
+                  <span>備註</span>
+                  <input v-model.trim="suggestion.itemText" type="text" maxlength="255" aria-label="快速新增備註" />
+                </label>
+              </li>
+            </ul>
+          </section>
+
+          <section v-if="quickAddUnparsedItems.length > 0" class="quick-add-unparsed" aria-label="未代入項目">
+            <h3>未代入項目</h3>
+            <ul>
+              <li v-for="item in quickAddUnparsedItems" :key="item">{{ item }}</li>
+            </ul>
+          </section>
+        </div>
+        <div class="modal-actions">
+          <button type="button" @click="closeQuickAddDialog">取消</button>
+          <button type="button" :disabled="!canApplyQuickAddSuggestions || isSubmittingQuickAdd" @click="applyQuickAddSuggestions">
+            {{ isSubmittingQuickAdd ? '送出中' : '代入' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
     <div v-if="editingTransaction" class="modal-backdrop" role="presentation">
       <section class="modal" role="dialog" aria-modal="true" aria-label="編輯帳目">
         <h2>編輯帳目</h2>
@@ -417,12 +524,15 @@
           </label>
           <label>
             <span>類別</span>
-            <select v-model="editForm.categoryName" @change="resetEditCustomCategory">
-              <option v-for="category in categoriesByType(editForm.type)" :key="category" :value="category">
-                {{ category }}
-              </option>
-              <option :value="CUSTOM_CATEGORY_VALUE">自訂類別</option>
-            </select>
+            <CategorySelect
+              v-model="editForm.categoryName"
+              allow-custom
+              label="編輯類別"
+              placeholder="類別"
+              :options="categoriesByType(editForm.type)"
+              @change="resetEditCustomCategory"
+              @focus="scrollSelectIntoView"
+            />
           </label>
           <label v-if="editForm.categoryName === CUSTOM_CATEGORY_VALUE">
             <span>自訂類別</span>
@@ -590,7 +700,38 @@ interface AxisTick {
   y: number;
 }
 
-const defaultExpenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長', '社交', '治裝費', '運動'];
+interface AiSuggestionMetadata {
+  suggestionId: string;
+  sourceText: string;
+  itemText: string;
+  modelLabel: string;
+  modelType: TransactionType;
+  modelCategory: string;
+  mappedType: TransactionType;
+  mappedCategoryName: string;
+  suggestedTransactionDate: string;
+  suggestedAmount: number;
+  suggestedNote: string | null;
+  confidence: number;
+  needsReview: boolean;
+  dateSource: string;
+  mappingSource: string;
+}
+
+interface QuickAddSuggestion extends AiSuggestionMetadata {
+  type: TransactionType;
+  transactionDate: string;
+  amount: number;
+  categoryName: string;
+  customCategoryName: string | null;
+}
+
+interface QuickAddParseResponse {
+  suggestions: QuickAddSuggestion[];
+  unparsedItems: string[];
+}
+
+const defaultExpenseCategories = ['飲食', '交通', '投資', '繳費', '自我成長', '娛樂', '治裝費', '運動'];
 const defaultIncomeCategories = ['投資', '薪資'];
 const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
 const DONUT_RADIUS = 42;
@@ -615,6 +756,133 @@ const firebaseApp = firebaseConfigured ? initializeApp(firebaseConfig) : null;
 const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 const googleProvider = new GoogleAuthProvider();
 const apiBaseUrl = resolveConfiguredApiBaseUrl(import.meta.env.VITE_API_BASE_URL, import.meta.env.PROD);
+
+const CategorySelect = defineComponent({
+  name: 'CategorySelect',
+  props: {
+    modelValue: {
+      type: String,
+      required: true
+    },
+    options: {
+      type: Array as PropType<string[]>,
+      required: true
+    },
+    placeholder: {
+      type: String,
+      default: '類別'
+    },
+    label: {
+      type: String,
+      required: true
+    },
+    allowCustom: {
+      type: Boolean,
+      default: false
+    }
+  },
+  emits: ['update:modelValue', 'change', 'focus'],
+  setup(props, { emit }) {
+    const open = ref(false);
+    const root = ref<HTMLElement | null>(null);
+
+    const close = () => {
+      open.value = false;
+    };
+
+    const selectValue = (value: string) => {
+      emit('update:modelValue', value);
+      emit('change');
+      close();
+    };
+
+    const handleFocusout = (event: FocusEvent) => {
+      const nextTarget = event.relatedTarget;
+      if (nextTarget instanceof Node && root.value?.contains(nextTarget)) {
+        return;
+      }
+      close();
+    };
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        close();
+      }
+    };
+
+    return () => {
+      const optionItems = [
+        { value: '', label: props.placeholder },
+        ...props.options.map((option) => ({ value: option, label: option })),
+        ...(props.allowCustom ? [{ value: CUSTOM_CATEGORY_VALUE, label: '自訂類別' }] : [])
+      ];
+      const buttonText = props.modelValue === CUSTOM_CATEGORY_VALUE
+        ? '自訂類別'
+        : props.modelValue || props.placeholder;
+
+      return h(
+        'div',
+        {
+          ref: root,
+          class: 'category-select',
+          onFocusout: handleFocusout,
+          onKeydown: handleKeydown
+        },
+        [
+          h(
+            'button',
+            {
+              type: 'button',
+              class: ['category-select-trigger', { placeholder: !props.modelValue }],
+              'aria-label': props.label,
+              'aria-haspopup': 'listbox',
+              'aria-expanded': open.value ? 'true' : 'false',
+              onClick: () => {
+                open.value = !open.value;
+              },
+              onFocus: (event: FocusEvent) => emit('focus', event)
+            },
+            [
+              h('span', buttonText),
+              h(
+                'svg',
+                {
+                  class: 'category-select-icon',
+                  viewBox: '0 0 24 24',
+                  'aria-hidden': 'true'
+                },
+                [
+                  h('path', {
+                    d: 'M7 10l5 5 5-5'
+                  })
+                ]
+              )
+            ]
+          ),
+          open.value && h(
+            'div',
+            {
+              class: 'category-select-menu',
+              role: 'listbox'
+            },
+            optionItems.map((option) => h(
+              'button',
+              {
+                key: option.value,
+                type: 'button',
+                role: 'option',
+                class: ['category-select-option', { active: props.modelValue === option.value }],
+                'aria-selected': props.modelValue === option.value ? 'true' : 'false',
+                onClick: () => selectValue(option.value)
+              },
+              option.label
+            ))
+          )
+        ]
+      );
+    };
+  }
+});
 
 const todayDate = new Date();
 const today = formatDateInputValue(todayDate);
@@ -661,6 +929,12 @@ const editForm = ref<EditForm>(createEditForm());
 const isSavingEdit = ref(false);
 const isDeleting = ref(false);
 const currentUser = ref<User | null>(null);
+const quickAddDialogOpen = ref(false);
+const quickAddText = ref('');
+const quickAddSuggestions = ref<QuickAddSuggestion[]>([]);
+const quickAddUnparsedItems = ref<string[]>([]);
+const isParsingQuickAdd = ref(false);
+const isSubmittingQuickAdd = ref(false);
 
 const canSubmit = computed(() => rows.value.every((row) => {
   const amount = Number(row.amount);
@@ -673,6 +947,14 @@ const canSubmitEdit = computed(() => {
     && amount > 0
     && Boolean(getEditCategoryName());
 });
+const canApplyQuickAddSuggestions = computed(() => quickAddSuggestions.value.length > 0
+  && quickAddSuggestions.value.every((suggestion) => {
+    const amount = Number(suggestion.amount);
+    return Boolean(suggestion.type)
+      && Boolean(suggestion.transactionDate)
+      && amount > 0
+      && Boolean(getQuickAddSuggestionCategoryName(suggestion));
+  }));
 
 const summaryIncomeTotal = computed(() => sumSummaries(incomeCategorySummaries.value));
 const summaryExpenseTotal = computed(() => sumSummaries(expenseCategorySummaries.value));
@@ -965,6 +1247,20 @@ function normalizeAmount(row: EntryRow) {
   row.amount = row.amount.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
 }
 
+function scrollSelectIntoView(event: FocusEvent) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  window.setTimeout(() => {
+    target.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest'
+    });
+  }, 80);
+}
+
 async function submitBatch() {
   if (isSubmitting.value) {
     return;
@@ -1009,6 +1305,148 @@ async function submitBatch() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+function openQuickAddDialog() {
+  if (!currentUser.value) {
+    showMessage('請先登入');
+    return;
+  }
+  quickAddDialogOpen.value = true;
+}
+
+function closeQuickAddDialog() {
+  if (isParsingQuickAdd.value || isSubmittingQuickAdd.value) {
+    return;
+  }
+  quickAddDialogOpen.value = false;
+  quickAddText.value = '';
+  quickAddSuggestions.value = [];
+  quickAddUnparsedItems.value = [];
+}
+
+async function parseQuickAdd() {
+  if (!quickAddText.value || isParsingQuickAdd.value) {
+    return;
+  }
+
+  isParsingQuickAdd.value = true;
+  try {
+    const response = await apiFetch('/api/ai/quick-add/parse', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text: quickAddText.value })
+    });
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, '快速新增解析失敗'));
+    }
+    const data = await response.json() as QuickAddParseResponse;
+    quickAddSuggestions.value = data.suggestions;
+    quickAddUnparsedItems.value = data.unparsedItems;
+    if (data.suggestions.length === 0 && data.unparsedItems.length === 0) {
+      showMessage('沒有可代入的項目');
+    }
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '快速新增解析失敗');
+  } finally {
+    isParsingQuickAdd.value = false;
+  }
+}
+
+async function applyQuickAddSuggestions() {
+  if (!canApplyQuickAddSuggestions.value) {
+    showMessage('請先確認解析結果');
+    return;
+  }
+
+  isSubmittingQuickAdd.value = true;
+  try {
+    const response = await apiFetch('/api/transactions/batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(buildQuickAddBatchPayload())
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, '快速新增送出失敗，請確認解析結果'));
+    }
+
+    const [recentLoaded, summaryLoaded, categoriesLoaded] = await Promise.all([
+      loadRecent(false),
+      loadCategorySummary(false),
+      loadCategories(false)
+    ]);
+    quickAddDialogOpen.value = false;
+    quickAddText.value = '';
+    quickAddSuggestions.value = [];
+    quickAddUnparsedItems.value = [];
+    showMessage(recentLoaded && summaryLoaded && categoriesLoaded ? '快速新增完成' : '快速新增完成，部分資料重新載入失敗');
+  } catch (error) {
+    showMessage(error instanceof Error ? error.message : '快速新增送出失敗');
+  } finally {
+    isSubmittingQuickAdd.value = false;
+  }
+}
+
+function createQuickAddSessionId() {
+  return crypto.randomUUID?.() ?? `quick-add-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function buildQuickAddBatchPayload() {
+  return {
+    quickAddSessionId: createQuickAddSessionId(),
+    quickAddInputText: quickAddText.value,
+    transactions: quickAddSuggestions.value.map((suggestion) => ({
+      type: suggestion.type,
+      transactionDate: suggestion.transactionDate,
+      amount: Number(suggestion.amount),
+      categoryName: getQuickAddSuggestionCategoryName(suggestion),
+      note: suggestion.itemText.trim() || null,
+      aiSuggestion: buildQuickAddAiSuggestionMetadata(suggestion)
+    }))
+  };
+}
+
+function buildQuickAddAiSuggestionMetadata(suggestion: QuickAddSuggestion): AiSuggestionMetadata {
+  return {
+    suggestionId: suggestion.suggestionId,
+    sourceText: suggestion.sourceText,
+    itemText: suggestion.suggestedNote?.trim() || suggestion.sourceText.trim() || suggestion.itemText.trim(),
+    modelLabel: suggestion.modelLabel,
+    modelType: suggestion.modelType,
+    modelCategory: suggestion.modelCategory,
+    mappedType: suggestion.mappedType,
+    mappedCategoryName: suggestion.mappedCategoryName,
+    suggestedTransactionDate: suggestion.suggestedTransactionDate,
+    suggestedAmount: suggestion.suggestedAmount,
+    suggestedNote: suggestion.suggestedNote,
+    confidence: suggestion.confidence,
+    needsReview: suggestion.needsReview,
+    dateSource: suggestion.dateSource,
+    mappingSource: suggestion.mappingSource
+  };
+}
+
+function resetQuickAddSuggestionCategory(suggestion: QuickAddSuggestion) {
+  suggestion.categoryName = '';
+  suggestion.customCategoryName = null;
+}
+
+function resetQuickAddSuggestionCustomCategory(suggestion: QuickAddSuggestion) {
+  if (suggestion.categoryName !== CUSTOM_CATEGORY_VALUE) {
+    suggestion.customCategoryName = null;
+  }
+}
+
+function getQuickAddSuggestionCategoryName(suggestion: QuickAddSuggestion) {
+  if (suggestion.categoryName === CUSTOM_CATEGORY_VALUE) {
+    return suggestion.customCategoryName?.trim() ?? '';
+  }
+  return suggestion.categoryName.trim();
 }
 
 function openEditDialog(transaction: TransactionResponse) {

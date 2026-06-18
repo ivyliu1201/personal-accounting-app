@@ -31,6 +31,8 @@ FIREBASE_PROJECT_ID=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 APP_CORS_ALLOWED_ORIGINS=
+AI_CATEGORY_SERVICE_URL=
+AI_CATEGORY_SERVICE_TOKEN=
 ```
 
 規則：
@@ -39,6 +41,8 @@ APP_CORS_ALLOWED_ORIGINS=
 - `SUPABASE_URL` 是 Supabase project URL。
 - `SUPABASE_SERVICE_ROLE_KEY` 必須視為密鑰。
 - `APP_CORS_ALLOWED_ORIGINS` 是前端 origin allowlist，以逗號分隔。
+- `AI_CATEGORY_SERVICE_URL` 是 AI 分類服務 URL，用於快速新增解析；啟用快速新增時必填。
+- `AI_CATEGORY_SERVICE_TOKEN` 是 Worker 呼叫 AI 分類服務時使用的服務 token；正式環境應視為密鑰。
 
 ## 3. 本機開發
 

@@ -1,4 +1,5 @@
 import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
+import { formatQuickAddAppDate, parseQuickAddRequest } from './aiQuickAdd';
 import { listCategoryOptions, parseTransactionType } from './categories';
 import { getSupabaseClient } from './db';
 import {
@@ -75,6 +76,32 @@ export default {
           return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
         }
         return jsonResponse<ErrorResponse>({ message: 'Authentication failed' }, 401, corsOrigin);
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/ai/quick-add/parse') {
+      try {
+        const user = await authenticateFirebaseRequest(request, env);
+        const body = await request.json();
+        const response = await parseQuickAddRequest({
+          env,
+          user,
+          body,
+          supabase,
+          today: formatQuickAddAppDate(new Date())
+        });
+        return jsonResponse(response, 200, corsOrigin);
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          return jsonResponse<ErrorResponse>({ message: 'Request body is invalid' }, 400, corsOrigin);
+        }
+        if (error instanceof RangeError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, 400, corsOrigin);
+        }
+        if (error instanceof AuthError) {
+          return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
+        }
+        return jsonResponse<ErrorResponse>({ message: 'Quick add parsing failed' }, 500, corsOrigin);
       }
     }
 

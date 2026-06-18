@@ -7,6 +7,7 @@
   -> Cloudflare Pages 前端
   -> Cloudflare Worker API
   -> Supabase Postgres
+  -> Cloud Run AI Category Service
 ```
 
 登入驗證：
@@ -48,6 +49,7 @@
 - Supabase client：`worker/src/db.ts`。
 - 帳目邏輯：`worker/src/transactions.ts`。
 - 類別邏輯：`worker/src/categories.ts`。
+- AI 快速新增邏輯：`worker/src/aiQuickAdd.ts`、`worker/src/aiFeedback.ts`。
 
 職責：
 
@@ -58,8 +60,17 @@
 - 需要時建立自訂類別。
 - 查詢 Supabase Postgres。
 - 回傳穩定的 JSON response。
+- 透過 Worker secrets 呼叫獨立 AI 分類服務，前端不得直接呼叫 AI 服務。
+- 儲存 AI 快速新增回饋，供後續模型訓練資料篩選使用。
 
-### 2.3 資料庫
+### 2.3 AI 分類服務
+
+- 位置：獨立專案 `C:\ivy\code\ai-accounting-category-api`。
+- 正式部署目標：Cloud Run。
+- 對 Worker 提供自然語句解析與模型標籤，不處理記帳系統使用者類別。
+- 記帳系統類別對應、使用者自訂類別與 feedback 寫入由 Worker 負責。
+
+### 2.4 資料庫
 
 - 平台：Supabase Postgres。
 - 主要資料表與資料隔離規則定義於 `05-database.md`。

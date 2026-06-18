@@ -16,6 +16,8 @@ FIREBASE_PROJECT_ID
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 APP_CORS_ALLOWED_ORIGINS
+AI_CATEGORY_SERVICE_URL
+AI_CATEGORY_SERVICE_TOKEN
 ```
 
 部署：
@@ -27,7 +29,19 @@ npm run deploy
 
 部署後，記錄 Worker URL，並作為前端的 `VITE_API_BASE_URL`。
 
-## 3. 前端部署
+`AI_CATEGORY_SERVICE_URL` 指向獨立部署的 AI 分類服務。`AI_CATEGORY_SERVICE_TOKEN` 應設定為 Worker secret，不得放入前端環境變數。
+
+## 3. AI 分類服務部署
+
+AI 分類服務位於獨立專案：
+
+```text
+C:\ivy\code\ai-accounting-category-api
+```
+
+正式部署目標為 Cloud Run。此服務只提供自然語句解析與模型標籤，記帳系統的使用者驗證、類別對應、資料庫寫入與 feedback 儲存仍由 Worker 負責。
+
+## 4. 前端部署
 
 前端正式部署主線使用 Cloudflare Pages GitHub integration。
 
@@ -69,13 +83,13 @@ npm run build
 
 除非 Cloudflare Pages GitHub integration 暫時不可用，否則不使用 Wrangler direct upload 作為正式前端部署主線。
 
-## 4. Firebase 設定
+## 5. Firebase 設定
 
 正式前端網域必須加入 Firebase Authentication 允許網域。
 
 部署後需在正式前端網域測試 Google 登入。
 
-## 5. CORS
+## 6. CORS
 
 Worker 的 `APP_CORS_ALLOWED_ORIGINS` 必須包含 Cloudflare Pages 前端 origin。
 
@@ -85,7 +99,7 @@ Worker 的 `APP_CORS_ALLOWED_ORIGINS` 必須包含 Cloudflare Pages 前端 origi
 https://personal-accounting-frontend.pages.dev
 ```
 
-## 6. 部署驗證
+## 7. 部署驗證
 
 部署後：
 
