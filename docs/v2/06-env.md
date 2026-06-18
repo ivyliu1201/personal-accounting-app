@@ -42,7 +42,7 @@ AI_CATEGORY_SERVICE_TOKEN=
 - `SUPABASE_SERVICE_ROLE_KEY` 必須視為密鑰。
 - `APP_CORS_ALLOWED_ORIGINS` 是前端 origin allowlist，以逗號分隔。
 - `AI_CATEGORY_SERVICE_URL` 是 AI 分類服務 URL，用於快速新增解析；啟用快速新增時必填。
-- `AI_CATEGORY_SERVICE_TOKEN` 是 Worker 呼叫 AI 分類服務時使用的服務 token；正式環境應視為密鑰。
+- `AI_CATEGORY_SERVICE_TOKEN` 是 Worker 呼叫 AI 分類服務時使用的服務 token；正式環境應視為密鑰。前端不得讀取或持有此 token。
 
 ## 3. 本機開發
 
@@ -70,6 +70,8 @@ npm run dev:local
 
 - 敏感值應存放為 Worker secrets。
 - 設定允許的前端 origins。
+- `AI_CATEGORY_SERVICE_URL` 必須指向已部署且通過評估的 AI API。
+- `SUPABASE_SERVICE_ROLE_KEY` 對應的角色需已取得 `ai_quick_add_feedback` 的存取權限。
 
 ## 5. 環境變數變更規則
 

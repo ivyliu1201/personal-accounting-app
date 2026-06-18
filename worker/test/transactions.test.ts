@@ -20,6 +20,7 @@ import {
   validateBatchCreateRequest
 } from '../src/transactions';
 import type { AuthenticatedUser } from '../src/auth';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface FakeCategoryRow {
   id: string;
@@ -47,238 +48,17 @@ interface FakeSupabaseTransactionRow extends FakeTransactionRow {
   };
 }
 
-class FakePreparedStatement {
-  private readonly database: FakeD1Database;
-  private readonly sql: string;
-  private values: unknown[] = [];
-
-  constructor(database: FakeD1Database, sql: string) {
-    this.database = database;
-    this.sql = sql;
-  }
-
-  bind(...values: unknown[]) {
-    this.values = values;
-    return this;
-  }
-
-  async first<T>() {
-    if (this.sql.includes('from accounting_transactions t')) {
-      const [id, userId] = this.values;
-      const transaction = this.database.transactions
-        .find((row) => row.id === id && row.user_id === userId);
-      return (transaction ? this.buildTransactionRow(transaction) : null) as T | null;
-    }
-
-    if (this.sql.includes('from categories')) {
-      const [type, name, userId] = this.values;
-      const row = this.database.categories
-        .filter((category) => category.type === type
-          && category.name === name
-          && (category.user_id === userId || category.user_id === null))
-        .sort((left, right) => right.default_category - left.default_category)[0];
-      return (row ? { id: row.id } : null) as T | null;
-    }
-    throw new Error('Unsupported first query');
-  }
-
-  async all<T>() {
-    if (this.sql.includes('group by c.name')) {
-      const [userId, type, startDate, endDate] = this.values;
-      const amountByCategoryName = new Map<string, number>();
-      for (const transaction of this.database.transactions) {
-        if (transaction.user_id !== userId
-          || transaction.type !== type
-          || transaction.transaction_date < String(startDate)
-          || transaction.transaction_date > String(endDate)) {
-          continue;
-        }
-        const category = this.database.getCategory(transaction.category_id);
-        amountByCategoryName.set(
-          category.name,
-          (amountByCategoryName.get(category.name) ?? 0) + transaction.amount
-        );
-      }
-      const rows = Array.from(amountByCategoryName.entries())
-        .map(([categoryName, amount]) => ({ category_name: categoryName, amount }))
-        .sort((left, right) => right.amount - left.amount || left.category_name.localeCompare(right.category_name, 'zh-Hant'));
-      return { results: rows } as { results: T[] };
-    }
-
-    if (this.sql.includes("case when t.type = 'INCOME'")) {
-      const [userId, startDate, endDate] = this.values;
-      const amountByLabel = new Map<string, number>();
-      for (const transaction of this.database.transactions) {
-        if (transaction.user_id !== userId
-          || transaction.transaction_date < String(startDate)
-          || transaction.transaction_date > String(endDate)) {
-          continue;
-        }
-        const label = transaction.transaction_date.slice(0, 7);
-        const amount = transaction.type === 'INCOME' ? transaction.amount : -transaction.amount;
-        amountByLabel.set(label, (amountByLabel.get(label) ?? 0) + amount);
-      }
-      const rows = Array.from(amountByLabel.entries())
-        .map(([label, amount]) => ({ label, amount }))
-        .sort((left, right) => left.label.localeCompare(right.label));
-      return { results: rows } as { results: T[] };
-    }
-
-    if (this.sql.includes('group by t.transaction_date')) {
-      const [userId, type, startDate, endDate] = this.values;
-      const amountByLabel = this.sumByLabel(userId, type, startDate, endDate, (transaction) => transaction.transaction_date);
-      const rows = Array.from(amountByLabel.entries())
-        .map(([label, amount]) => ({ label, amount }))
-        .sort((left, right) => left.label.localeCompare(right.label));
-      return { results: rows } as { results: T[] };
-    }
-
-    if (this.sql.includes('group by substr(t.transaction_date, 1, 7)')) {
-      const [userId, type, startDate, endDate] = this.values;
-      const amountByLabel = this.sumByLabel(userId, type, startDate, endDate, (transaction) => transaction.transaction_date.slice(0, 7));
-      const rows = Array.from(amountByLabel.entries())
-        .map(([label, amount]) => ({ label, amount }))
-        .sort((left, right) => left.label.localeCompare(right.label));
-      return { results: rows } as { results: T[] };
-    }
-
-    if (this.sql.includes('from accounting_transactions t') && this.sql.includes('limit ?') && this.sql.includes('offset ?')) {
-      const [userId, type, startDate, endDate, limit, offset] = this.values;
-      const rows = this.database.transactions
-        .filter((transaction) => transaction.user_id === userId
-          && transaction.type === type
-          && transaction.transaction_date >= String(startDate)
-          && transaction.transaction_date <= String(endDate))
-        .sort((left, right) => {
-          const dateOrder = right.transaction_date.localeCompare(left.transaction_date);
-          return dateOrder === 0 ? right.created_at.localeCompare(left.created_at) : dateOrder;
-        })
-        .slice(Number(offset), Number(offset) + Number(limit))
-        .map((transaction) => this.buildTransactionRow(transaction));
-      return { results: rows } as { results: T[] };
-    }
-
-    if (this.sql.includes('from accounting_transactions t')) {
-      const [userId, limit] = this.values;
-      const rows = this.database.transactions
-        .filter((transaction) => transaction.user_id === userId)
-        .sort((left, right) => right.created_at.localeCompare(left.created_at))
-        .slice(0, Number(limit))
-        .map((transaction) => this.buildTransactionRow(transaction));
-      return { results: rows } as { results: T[] };
-    }
-
-    throw new Error('Unsupported all query');
-  }
-
-  private sumByLabel(
-    userId: unknown,
-    type: unknown,
-    startDate: unknown,
-    endDate: unknown,
-    labelSelector: (transaction: FakeTransactionRow) => string
-  ) {
-    const amountByLabel = new Map<string, number>();
-    for (const transaction of this.database.transactions) {
-      if (transaction.user_id !== userId
-        || transaction.type !== type
-        || transaction.transaction_date < String(startDate)
-        || transaction.transaction_date > String(endDate)) {
-        continue;
-      }
-      const label = labelSelector(transaction);
-      amountByLabel.set(label, (amountByLabel.get(label) ?? 0) + transaction.amount);
-    }
-    return amountByLabel;
-  }
-
-  private buildTransactionRow(transaction: FakeTransactionRow) {
-    const category = this.database.categories.find((candidate) => candidate.id === transaction.category_id);
-    if (!category) {
-      throw new Error('Category not found');
-    }
-    return {
-      id: transaction.id,
-      type: transaction.type,
-      transaction_date: transaction.transaction_date,
-      amount: transaction.amount,
-      category_name: category.name,
-      note: transaction.note,
-      created_at: transaction.created_at
-    };
-  }
-
-  execute() {
-    if (this.sql.includes('insert into categories')) {
-      const [id, userId, type, name, createdAt] = this.values;
-      this.database.categories.push({
-        id: String(id),
-        user_id: String(userId),
-        type: String(type),
-        name: String(name),
-        default_category: 0,
-        created_at: String(createdAt)
-      });
-      return;
-    }
-
-    if (this.sql.includes('insert into accounting_transactions')) {
-      const [id, userId, type, transactionDate, amount, categoryId, note, createdAt] = this.values;
-      this.database.transactions.push({
-        id: String(id),
-        user_id: String(userId),
-        type: String(type),
-        transaction_date: String(transactionDate),
-        amount: Number(amount),
-        category_id: String(categoryId),
-        note: note === null ? null : String(note),
-        created_at: String(createdAt)
-      });
-      return;
-    }
-
-    if (this.sql.includes('update accounting_transactions')) {
-      const [type, transactionDate, amount, categoryId, note, id, userId] = this.values;
-      const transaction = this.database.transactions.find((row) => row.id === id && row.user_id === userId);
-      if (transaction) {
-        transaction.type = String(type);
-        transaction.transaction_date = String(transactionDate);
-        transaction.amount = Number(amount);
-        transaction.category_id = String(categoryId);
-        transaction.note = note === null ? null : String(note);
-      }
-      return;
-    }
-
-    if (this.sql.includes('delete from accounting_transactions')) {
-      const [id, userId] = this.values;
-      const index = this.database.transactions.findIndex((row) => row.id === id && row.user_id === userId);
-      if (index >= 0) {
-        this.database.transactions.splice(index, 1);
-      }
-      return;
-    }
-
-    throw new Error('Unsupported statement');
-  }
-
-  async run() {
-    this.execute();
-    return { success: true };
-  }
-}
-
-class FakeD1Database {
+class FakeSupabaseDatabase {
   readonly categories: FakeCategoryRow[];
-  readonly transactions: FakeTransactionRow[] = [];
-  batchSize = 0;
+  transactions: FakeTransactionRow[] = [];
+  readonly aiFeedbackRows: unknown[] = [];
 
   constructor(categories: FakeCategoryRow[]) {
     this.categories = categories;
   }
 
-  prepare(sql: string) {
-    return new FakePreparedStatement(this, sql);
+  from(tableName: string) {
+    return new FakeSupabaseQuery(this, tableName);
   }
 
   getCategory(id: string) {
@@ -288,51 +68,69 @@ class FakeD1Database {
     }
     return category;
   }
-
-  async batch(statements: FakePreparedStatement[]) {
-    this.batchSize = statements.length;
-    for (const statement of statements) {
-      statement.execute();
-    }
-    return [];
-  }
 }
 
-class FakeSupabaseTransactionQuery {
-  private rows: FakeSupabaseTransactionRow[];
+class FakeSupabaseQuery {
+  private readonly database: FakeSupabaseDatabase;
+  private readonly tableName: string;
+  private operation: 'select' | 'insert' | 'update' | 'delete' = 'select';
+  private readonly filters: Array<{ fieldName: string; operator: 'eq' | 'gte' | 'lte' | 'is'; value: unknown }> = [];
+  private readonly orders: Array<{ fieldName: string; ascending: boolean }> = [];
   private from = 0;
   private to: number | null = null;
-  private orderBy: keyof FakeSupabaseTransactionRow | null = null;
+  private insertPayload: unknown;
+  private updatePayload: Record<string, unknown> = {};
+  private single = false;
 
-  constructor(rows: FakeSupabaseTransactionRow[]) {
-    this.rows = rows;
+  constructor(database: FakeSupabaseDatabase, tableName: string) {
+    this.database = database;
+    this.tableName = tableName;
   }
 
   select() {
+    this.operation = 'select';
     return this;
   }
 
-  eq(fieldName: keyof FakeSupabaseTransactionRow, value: unknown) {
-    this.rows = this.rows.filter((row) => row[fieldName] === value);
+  insert(payload: unknown) {
+    this.operation = 'insert';
+    this.insertPayload = payload;
     return this;
   }
 
-  gte(fieldName: keyof FakeSupabaseTransactionRow, value: unknown) {
-    this.rows = this.rows.filter((row) => String(row[fieldName]) >= String(value));
+  update(payload: Record<string, unknown>) {
+    this.operation = 'update';
+    this.updatePayload = payload;
     return this;
   }
 
-  lte(fieldName: keyof FakeSupabaseTransactionRow, value: unknown) {
-    this.rows = this.rows.filter((row) => String(row[fieldName]) <= String(value));
+  delete() {
+    this.operation = 'delete';
     return this;
   }
 
-  order(fieldName: keyof FakeSupabaseTransactionRow, options: { ascending: boolean }) {
-    this.orderBy = fieldName;
-    this.rows = [...this.rows].sort((left, right) => {
-      const result = String(left[fieldName]).localeCompare(String(right[fieldName]));
-      return options.ascending ? result : -result;
-    });
+  eq(fieldName: string, value: unknown) {
+    this.filters.push({ fieldName, operator: 'eq', value });
+    return this;
+  }
+
+  gte(fieldName: string, value: unknown) {
+    this.filters.push({ fieldName, operator: 'gte', value });
+    return this;
+  }
+
+  lte(fieldName: string, value: unknown) {
+    this.filters.push({ fieldName, operator: 'lte', value });
+    return this;
+  }
+
+  is(fieldName: string, value: unknown) {
+    this.filters.push({ fieldName, operator: 'is', value });
+    return this;
+  }
+
+  order(fieldName: string, options: { ascending: boolean }) {
+    this.orders.push({ fieldName, ascending: options.ascending });
     return this;
   }
 
@@ -342,11 +140,132 @@ class FakeSupabaseTransactionQuery {
     return this;
   }
 
+  maybeSingle() {
+    this.single = true;
+    return this;
+  }
+
   then<TResult>(
-    resolve: (value: { data: FakeSupabaseTransactionRow[]; error: null }) => TResult
+    resolve: (value: { data: unknown; error: null }) => TResult,
+    reject?: (reason: unknown) => TResult
   ) {
-    const selectedRows = this.to === null ? this.rows : this.rows.slice(this.from, this.to + 1);
-    return Promise.resolve(resolve({ data: selectedRows, error: null }));
+    try {
+      return Promise.resolve(resolve({ data: this.execute(), error: null }));
+    } catch (error) {
+      if (reject) {
+        return Promise.resolve(reject(error));
+      }
+      return Promise.reject(error);
+    }
+  }
+
+  private execute() {
+    if (this.operation === 'insert') {
+      return this.executeInsert();
+    }
+    if (this.operation === 'update') {
+      this.executeUpdate();
+      return null;
+    }
+    if (this.operation === 'delete') {
+      this.executeDelete();
+      return null;
+    }
+    return this.executeSelect();
+  }
+
+  private executeSelect() {
+    if (this.tableName === 'categories') {
+      const rows = this.filterRows(this.database.categories);
+      const data = rows.map((row) => ({ id: row.id }));
+      return this.single ? data[0] ?? null : data;
+    }
+    if (this.tableName === 'accounting_transactions') {
+      let rows = this.filterRows(this.database.transactions)
+        .map((row) => this.buildTransactionRow(row));
+      rows = this.sortRows(rows);
+      if (this.to !== null) {
+        rows = rows.slice(this.from, this.to + 1);
+      }
+      return this.single ? rows[0] ?? null : rows;
+    }
+    if (this.tableName === 'ai_quick_add_feedback') {
+      return this.single ? null : [];
+    }
+    throw new Error(`Unsupported table: ${this.tableName}`);
+  }
+
+  private executeInsert() {
+    if (this.tableName === 'categories') {
+      this.database.categories.push(this.insertPayload as FakeCategoryRow);
+      return null;
+    }
+    if (this.tableName === 'accounting_transactions') {
+      this.database.transactions.push(this.insertPayload as FakeTransactionRow);
+      return null;
+    }
+    if (this.tableName === 'ai_quick_add_feedback') {
+      this.database.aiFeedbackRows.push(this.insertPayload);
+      return null;
+    }
+    throw new Error(`Unsupported table: ${this.tableName}`);
+  }
+
+  private executeUpdate() {
+    if (this.tableName !== 'accounting_transactions') {
+      throw new Error(`Unsupported update table: ${this.tableName}`);
+    }
+    for (const row of this.filterRows(this.database.transactions)) {
+      Object.assign(row, this.updatePayload);
+    }
+  }
+
+  private executeDelete() {
+    if (this.tableName !== 'accounting_transactions') {
+      throw new Error(`Unsupported delete table: ${this.tableName}`);
+    }
+    const rowsToDelete = new Set(this.filterRows(this.database.transactions));
+    this.database.transactions = this.database.transactions.filter((row) => !rowsToDelete.has(row));
+  }
+
+  private filterRows<T extends Record<string, unknown>>(rows: T[]): T[] {
+    return rows.filter((row) => this.filters.every((filter) => {
+      const value = row[filter.fieldName];
+      if (filter.operator === 'eq') {
+        return value === filter.value;
+      }
+      if (filter.operator === 'gte') {
+        return String(value) >= String(filter.value);
+      }
+      if (filter.operator === 'lte') {
+        return String(value) <= String(filter.value);
+      }
+      return value === filter.value;
+    }));
+  }
+
+  private sortRows<T extends Record<string, unknown>>(rows: T[]): T[] {
+    if (this.orders.length === 0) {
+      return rows;
+    }
+    return [...rows].sort((left, right) => {
+      for (const order of this.orders) {
+        const result = String(left[order.fieldName]).localeCompare(String(right[order.fieldName]));
+        if (result !== 0) {
+          return order.ascending ? result : -result;
+        }
+      }
+      return 0;
+    });
+  }
+
+  private buildTransactionRow(row: FakeTransactionRow): FakeSupabaseTransactionRow {
+    return {
+      ...row,
+      categories: {
+        name: this.database.getCategory(row.category_id).name
+      }
+    };
   }
 }
 
@@ -479,7 +398,7 @@ test('resolveSummaryDateRange uses Asia Taipei date for default month range', ()
 });
 
 test('createBatchTransactions uses existing default category and authenticated user id', async () => {
-  const database = new FakeD1Database([{
+  const database = new FakeSupabaseDatabase([{
     id: 'default-food',
     user_id: null,
     type: 'EXPENSE',
@@ -488,7 +407,7 @@ test('createBatchTransactions uses existing default category and authenticated u
     created_at: fixedNow.toISOString()
   }]);
 
-  const response = await createBatchTransactions(database as unknown as D1Database, user, {
+  const response = await createBatchTransactions(database as unknown as SupabaseClient, user, {
     userId: 'attacker-user',
     transactions: [{
       type: 'EXPENSE',
@@ -503,14 +422,13 @@ test('createBatchTransactions uses existing default category and authenticated u
   assert.equal(database.transactions[0].user_id, 'firebase-user-1');
   assert.equal(database.transactions[0].category_id, 'default-food');
   assert.equal(database.transactions[0].note, null);
-  assert.equal(database.batchSize, 1);
   assert.equal(response.transactions[0].categoryName, '飲食');
 });
 
 test('createBatchTransactions creates custom category for current user', async () => {
-  const database = new FakeD1Database([]);
+  const database = new FakeSupabaseDatabase([]);
 
-  await createBatchTransactions(database as unknown as D1Database, user, {
+  await createBatchTransactions(database as unknown as SupabaseClient, user, {
     transactions: [{
       type: 'INCOME',
       transactionDate: '2026-05-02',
@@ -526,13 +444,12 @@ test('createBatchTransactions creates custom category for current user', async (
   assert.equal(database.categories[0].name, '副業');
   assert.equal(database.transactions.length, 1);
   assert.equal(database.transactions[0].category_id, database.categories[0].id);
-  assert.equal(database.batchSize, 2);
 });
 
 test('createBatchTransactions reuses new custom category within same batch', async () => {
-  const database = new FakeD1Database([]);
+  const database = new FakeSupabaseDatabase([]);
 
-  await createBatchTransactions(database as unknown as D1Database, user, {
+  await createBatchTransactions(database as unknown as SupabaseClient, user, {
     transactions: [
       {
         type: 'EXPENSE',
@@ -555,14 +472,13 @@ test('createBatchTransactions reuses new custom category within same batch', asy
   assert.equal(database.transactions.length, 2);
   assert.equal(database.transactions[0].category_id, database.categories[0].id);
   assert.equal(database.transactions[1].category_id, database.categories[0].id);
-  assert.equal(database.batchSize, 3);
 });
 
 test('createBatchTransactions validates entire batch before writes', async () => {
-  const database = new FakeD1Database([]);
+  const database = new FakeSupabaseDatabase([]);
 
   await assert.rejects(
-    () => createBatchTransactions(database as unknown as D1Database, user, {
+    () => createBatchTransactions(database as unknown as SupabaseClient, user, {
       transactions: [
         {
           type: 'EXPENSE',
@@ -583,11 +499,11 @@ test('createBatchTransactions validates entire batch before writes', async () =>
 
   assert.equal(database.categories.length, 0);
   assert.equal(database.transactions.length, 0);
-  assert.equal(database.batchSize, 0);
 });
 
 test('listRecentTransactions returns today rows ordered by category', async () => {
-  const rows = [
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
+  database.transactions.push(
     {
       id: 'older-transaction',
       user_id: 'firebase-user-1',
@@ -596,8 +512,7 @@ test('listRecentTransactions returns today rows ordered by category', async () =
       amount: 120,
       category_id: 'default-food',
       note: 'older',
-      created_at: '2026-05-02T10:00:00.000Z',
-      categories: { name: '飲食' }
+      created_at: '2026-05-02T10:00:00.000Z'
     },
     {
       id: 'hidden-transaction',
@@ -607,8 +522,7 @@ test('listRecentTransactions returns today rows ordered by category', async () =
       amount: 999,
       category_id: 'default-food',
       note: 'hidden',
-      created_at: '2026-05-02T09:00:00.000Z',
-      categories: { name: '飲食' }
+      created_at: '2026-05-02T09:00:00.000Z'
     },
     {
       id: 'today-food',
@@ -618,8 +532,7 @@ test('listRecentTransactions returns today rows ordered by category', async () =
       amount: 90,
       category_id: 'default-food',
       note: 'today food',
-      created_at: '2026-05-02T07:00:00.000Z',
-      categories: { name: '飲食' }
+      created_at: '2026-05-02T07:00:00.000Z'
     },
     {
       id: 'newer-transaction',
@@ -629,15 +542,11 @@ test('listRecentTransactions returns today rows ordered by category', async () =
       amount: 3000,
       category_id: 'default-salary',
       note: null,
-      created_at: '2026-05-02T08:00:00.000Z',
-      categories: { name: '薪資' }
+      created_at: '2026-05-02T08:00:00.000Z'
     }
-  ];
-  const supabase = {
-    from: () => new FakeSupabaseTransactionQuery(rows)
-  };
+  );
 
-  const transactions = await listRecentTransactions(supabase as unknown as D1Database, user, 2, fixedNow);
+  const transactions = await listRecentTransactions(database as unknown as SupabaseClient, user, 2, fixedNow);
 
   assert.deepEqual(transactions, [
     {
@@ -662,7 +571,7 @@ test('listRecentTransactions returns today rows ordered by category', async () =
 });
 
 test('listHistoryTransactions returns date range rows with pagination state', async () => {
-  const database = new FakeD1Database([
+  const database = new FakeSupabaseDatabase([
     {
       id: 'default-food',
       user_id: null,
@@ -753,7 +662,7 @@ test('listHistoryTransactions returns date range rows with pagination state', as
   );
 
   const firstPage = await listHistoryTransactions(
-    database as unknown as D1Database,
+    database as unknown as SupabaseClient,
     user,
     'EXPENSE',
     '2026-04-27',
@@ -771,7 +680,7 @@ test('listHistoryTransactions returns date range rows with pagination state', as
   ]);
 
   const secondPage = await listHistoryTransactions(
-    database as unknown as D1Database,
+    database as unknown as SupabaseClient,
     user,
     'EXPENSE',
     '2026-04-27',
@@ -787,7 +696,7 @@ test('listHistoryTransactions returns date range rows with pagination state', as
 });
 
 test('listCategorySummaries returns category totals and percentages', async () => {
-  const database = new FakeD1Database(createDefaultCategories());
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
   database.transactions.push(
     createFakeTransaction('food-1', 'firebase-user-1', 'EXPENSE', '2026-04-29', 100, 'default-food'),
     createFakeTransaction('food-2', 'firebase-user-1', 'EXPENSE', '2026-04-28', 50, 'default-food'),
@@ -797,7 +706,7 @@ test('listCategorySummaries returns category totals and percentages', async () =
   );
 
   const summaries = await listCategorySummaries(
-    database as unknown as D1Database,
+    database as unknown as SupabaseClient,
     user,
     'EXPENSE',
     '2026-04-27',
@@ -811,7 +720,7 @@ test('listCategorySummaries returns category totals and percentages', async () =
 });
 
 test('listHistoryTrend returns daily or monthly cumulative amounts', async () => {
-  const database = new FakeD1Database(createDefaultCategories());
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
   database.transactions.push(
     createFakeTransaction('day-1', 'firebase-user-1', 'EXPENSE', '2026-04-01', 100, 'default-food'),
     createFakeTransaction('day-2', 'firebase-user-1', 'EXPENSE', '2026-04-01', 50, 'default-transit'),
@@ -821,7 +730,7 @@ test('listHistoryTrend returns daily or monthly cumulative amounts', async () =>
   );
 
   const dailyTrend = await listHistoryTrend(
-    database as unknown as D1Database,
+    database as unknown as SupabaseClient,
     user,
     'EXPENSE',
     '2026-04-01',
@@ -833,7 +742,7 @@ test('listHistoryTrend returns daily or monthly cumulative amounts', async () =>
   ]);
 
   const monthlyTrend = await listHistoryTrend(
-    database as unknown as D1Database,
+    database as unknown as SupabaseClient,
     user,
     'EXPENSE',
     '2026-03-01',
@@ -846,7 +755,7 @@ test('listHistoryTrend returns daily or monthly cumulative amounts', async () =>
 });
 
 test('listAnnualCashFlowTrend returns monthly net and cumulative amounts', async () => {
-  const database = new FakeD1Database(createDefaultCategories());
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
   database.transactions.push(
     createFakeTransaction('income-jan', 'firebase-user-1', 'INCOME', '2026-01-10', 1000, 'default-salary'),
     createFakeTransaction('expense-jan', 'firebase-user-1', 'EXPENSE', '2026-01-11', 300, 'default-food'),
@@ -854,7 +763,7 @@ test('listAnnualCashFlowTrend returns monthly net and cumulative amounts', async
     createFakeTransaction('hidden', 'another-user', 'INCOME', '2026-01-10', 9999, 'default-salary')
   );
 
-  const trend = await listAnnualCashFlowTrend(database as unknown as D1Database, user, 2026, fixedNow);
+  const trend = await listAnnualCashFlowTrend(database as unknown as SupabaseClient, user, 2026, fixedNow);
 
   assert.deepEqual(trend, [
     { label: '2026-01', amount: 700, cumulativeAmount: 700 },
@@ -866,12 +775,12 @@ test('listAnnualCashFlowTrend returns monthly net and cumulative amounts', async
 });
 
 test('updateTransaction changes editable fields and creates custom category', async () => {
-  const database = new FakeD1Database(createDefaultCategories());
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
   database.transactions.push(
     createFakeTransaction('editable', 'firebase-user-1', 'EXPENSE', '2026-04-27', 80, 'default-food', 'before')
   );
 
-  const response = await updateTransaction(database as unknown as D1Database, user, 'editable', {
+  const response = await updateTransaction(database as unknown as SupabaseClient, user, 'editable', {
     type: 'INCOME',
     transactionDate: '2026-04-28',
     amount: 1200,
@@ -890,13 +799,13 @@ test('updateTransaction changes editable fields and creates custom category', as
 });
 
 test('updateTransaction and deleteTransaction reject another user row', async () => {
-  const database = new FakeD1Database(createDefaultCategories());
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
   database.transactions.push(
     createFakeTransaction('hidden', 'another-user', 'EXPENSE', '2026-04-27', 80, 'default-food', 'hidden')
   );
 
   await assert.rejects(
-    () => updateTransaction(database as unknown as D1Database, user, 'hidden', {
+    () => updateTransaction(database as unknown as SupabaseClient, user, 'hidden', {
       type: 'EXPENSE',
       transactionDate: '2026-04-27',
       amount: 80,
@@ -906,20 +815,20 @@ test('updateTransaction and deleteTransaction reject another user row', async ()
     (error: unknown) => error instanceof TransactionNotFoundError
   );
   await assert.rejects(
-    () => deleteTransaction(database as unknown as D1Database, user, 'hidden'),
+    () => deleteTransaction(database as unknown as SupabaseClient, user, 'hidden'),
     (error: unknown) => error instanceof TransactionNotFoundError
   );
   assert.equal(database.transactions.length, 1);
 });
 
 test('deleteTransaction removes current user row', async () => {
-  const database = new FakeD1Database(createDefaultCategories());
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
   database.transactions.push(
     createFakeTransaction('delete-me', 'firebase-user-1', 'EXPENSE', '2026-04-27', 80, 'default-food', 'delete'),
     createFakeTransaction('keep-me', 'firebase-user-1', 'EXPENSE', '2026-04-28', 90, 'default-food', 'keep')
   );
 
-  await deleteTransaction(database as unknown as D1Database, user, 'delete-me');
+  await deleteTransaction(database as unknown as SupabaseClient, user, 'delete-me');
 
   assert.deepEqual(database.transactions.map((transaction) => transaction.id), ['keep-me']);
 });

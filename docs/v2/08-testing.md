@@ -67,8 +67,22 @@ npm run smoke:local
 - 類別摘要。
 - 年度現金流趨勢。
 - 更新與刪除的資料歸屬檢查。
+- AI 快速新增解析、個人修正規則、前次成功紀錄推斷。
+- 批次新增成功才寫入 AI feedback；新增失敗不得寫入 feedback。
 
-## 4. 人工驗證
+## 4. AI API 檢查
+
+AI API 位於 `C:\ivy\code\ai-accounting-category-api`。修改訓練資料或模型後需執行：
+
+```powershell
+python -m unittest test_train.py
+python train.py
+python evaluate.py
+```
+
+`evaluate.py` 必須確認新增的關鍵案例，例如吃飯、搭車、運動、打球、中獎收入。
+
+## 5. 人工驗證
 
 人工驗證應包含：
 
@@ -86,8 +100,9 @@ npm run smoke:local
 - 編輯帳目。
 - 刪除帳目與分頁行為。
 - 桌機與手機 viewport 檢查。
+- 快速新增解析後可修改每個欄位，送出後再次輸入相似文字會優先套用個人修正規則。
 
-## 5. 測試報告格式
+## 6. 測試報告格式
 
 變更後使用下列格式回報：
 

@@ -92,6 +92,17 @@ MVP 的資料模型刻意保持精簡：
 - `missed_by_ai` 表示該列是在快速新增 session 中由使用者手動補上，沒有對應 AI 建議。
 - 一般手動批次新增不寫入本表。
 - `corrected` 回饋可作為同一使用者後續快速新增的即時個人修正規則；只有成功建立帳目後寫入的回饋可被使用，避免新增失敗資料污染規則與訓練資料。
+- 本表的資料只能視為訓練候選資料；進入全域模型前必須通過人工或批次規則篩選，再寫入 AI API 專案的訓練資料並重新評估。
+
+必要權限：
+
+```sql
+grant usage on schema public to service_role;
+
+grant select, insert, update, delete
+    on table ai_quick_add_feedback
+    to service_role;
+```
 
 ## 5. 預設類別
 
@@ -127,3 +138,8 @@ Worker API 邏輯必須一律：
 任何 schema 變更都必須更新本文件；若 API contract 也改變，需同步更新 `04-api.md`。
 
 Schema 變更不得引入未定義產品行為，除非先更新 `01-product-spec.md`。
+
+目前 Worker migration 檔：
+
+- `worker/migrations/0002_create_ai_feedback_schema.sql`：建立 `ai_quick_add_feedback`。
+- `worker/migrations/0003_grant_ai_feedback_privileges.sql`：授權 Worker 使用的 Supabase `service_role` 存取 feedback table。

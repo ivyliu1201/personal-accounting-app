@@ -209,8 +209,22 @@ Cache-Control: no-store
 - 送出後若使用者修改 AI 代入列，Worker 會將 AI 建議與最終帳目寫入 `ai_quick_add_feedback`，標記為 `corrected`。
 - 同一快速新增 session 中，若使用者手動補上 AI 漏掉的列且該列沒有 `aiSuggestion`，Worker 會寫入 `missed_by_ai` 回饋。
 - 一般手動批次新增不需提供上述 AI 欄位，也不會產生 AI 回饋。
+- AI feedback 只在帳目成功新增後才寫入；批次驗證失敗或帳目 insert 失敗時，不得寫入 feedback。
+- feedback 寫入失敗不得造成已成功建立的帳目回滾；feedback 屬於訓練資料候選紀錄，不是記帳主資料。
 
-## 7. 今日明細
+## 7. AI feedback training boundary
+
+`ai_quick_add_feedback` 是訓練候選資料，不是直接自動改模型的線上訓練入口。
+
+目前規則：
+
+- `corrected` 可作為同一使用者後續快速新增的即時個人修正規則。
+- `accepted` 和 `corrected` 可供部署前人工篩選後加入全域訓練資料。
+- `missed_by_ai` 可供檢查 parser 漏拆或模型未覆蓋的案例。
+- 新增失敗、驗證失敗、沒有成功 transaction id 的資料不得進入訓練資料。
+- 全域訓練仍需經 `training_data.csv`、`train.py`、`evaluate.py` 驗證後才部署模型。
+
+## 8. 今日明細
 
 ### `GET /api/transactions/recent?limit=5`
 
@@ -243,7 +257,7 @@ Cache-Control: no-store
 ]
 ```
 
-## 8. 歷史明細
+## 9. 歷史明細
 
 ### `GET /api/transactions/history`
 
@@ -280,7 +294,7 @@ Cache-Control: no-store
 }
 ```
 
-## 9. 類別摘要
+## 10. 類別摘要
 
 ### `GET /api/transactions/category-summary`
 
@@ -311,7 +325,7 @@ Cache-Control: no-store
 ]
 ```
 
-## 10. 年度現金流趨勢
+## 11. 年度現金流趨勢
 
 ### `GET /api/transactions/cash-flow-trend?year=2026`
 
@@ -335,7 +349,7 @@ Cache-Control: no-store
 ]
 ```
 
-## 11. 更新帳目
+## 12. 更新帳目
 
 ### `PUT /api/transactions/{id}`
 
@@ -357,7 +371,7 @@ Cache-Control: no-store
 
 回應內容：`TransactionResponse`。
 
-## 12. 刪除帳目
+## 13. 刪除帳目
 
 ### `DELETE /api/transactions/{id}`
 

@@ -28,6 +28,8 @@ Vue 3 前端
 - 歷史查看支援類別分布與年度現金流趨勢。
 - 在歷史查看頁編輯與刪除單筆帳目。
 - 支援預設類別與新增自訂類別。
+- AI 快速新增：由 Worker 呼叫獨立 AI Category Service 解析文字，前端可在送出前修改類型、日期、金額、類別與備註。
+- AI feedback 保護：只有帳目成功新增後，才會把 AI 建議與使用者最後送出的結果寫入 `ai_quick_add_feedback`；新增失敗不會污染個人規則或後續訓練資料。
 - 前端 favicon 位於 `frontend/public/favicon.svg`。
 
 ## 技術棧
@@ -38,6 +40,7 @@ Vue 3 前端
 | Auth | Firebase Authentication |
 | API | Cloudflare Workers |
 | Database | Supabase Postgres |
+| AI service | FastAPI + PyTorch category classifier |
 | Deploy | Cloudflare Pages, Cloudflare Workers |
 
 前端部署採 Cloudflare Pages GitHub integration：push 到 GitHub `master` 後由 Cloudflare Pages 自動 build 與部署。Pages 專案設定請參考 [`docs/v2/09-deployment.md`](./docs/v2/09-deployment.md)。
@@ -47,8 +50,10 @@ Vue 3 前端
 ```text
 frontend/   Vue 3 前端
 worker/     Cloudflare Worker API
-docs/v2/    目前版本產品、架構、API、測試與 AI 協作文件
+docs/v2/    目前版本產品、架構、API、測試與部署文件
 ```
+
+AI 分類服務目前位於獨立專案 `C:\ivy\code\ai-accounting-category-api`，不在本 repository 內。
 
 ## 本機開發
 
@@ -123,6 +128,13 @@ Worker 測試：
 ```powershell
 cd worker
 npm test
+```
+
+部署前若有更新 AI 訓練資料，需在 AI API 專案執行：
+
+```powershell
+python train.py
+python evaluate.py
 ```
 
 完整測試策略請看 [`docs/v2/08-testing.md`](./docs/v2/08-testing.md)。

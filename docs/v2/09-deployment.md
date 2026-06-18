@@ -31,7 +31,24 @@ npm run deploy
 
 `AI_CATEGORY_SERVICE_URL` 指向獨立部署的 AI 分類服務。`AI_CATEGORY_SERVICE_TOKEN` 應設定為 Worker secret，不得放入前端環境變數。
 
-## 3. AI 分類服務部署
+部署前驗證：
+
+```powershell
+cd worker
+npm run typecheck
+npm test
+```
+
+## 3. Supabase migration
+
+部署 Worker 前，Supabase 必須已套用目前 schema：
+
+- `worker/migrations/0002_create_ai_feedback_schema.sql`
+- `worker/migrations/0003_grant_ai_feedback_privileges.sql`
+
+若使用 Supabase Dashboard，可在 SQL Editor 執行 `0003` 的 grant SQL。未套用時，快速新增的 feedback 寫入會因權限不足失敗；帳目主資料仍會新增，但個人規則和訓練候選資料不會更新。
+
+## 4. AI 分類服務部署
 
 AI 分類服務位於獨立專案：
 
@@ -41,7 +58,17 @@ C:\ivy\code\ai-accounting-category-api
 
 正式部署目標為 Cloud Run。此服務只提供自然語句解析與模型標籤，記帳系統的使用者驗證、類別對應、資料庫寫入與 feedback 儲存仍由 Worker 負責。
 
-## 4. 前端部署
+部署前需在 AI API 專案執行：
+
+```powershell
+python -m unittest test_train.py
+python train.py
+python evaluate.py
+```
+
+只有通過評估的 `transaction_classifier.pth` 才能部署。`training_data.csv` 仍是目前全域模型訓練資料來源；`ai_quick_add_feedback` 需經篩選後才可加入訓練資料。
+
+## 5. 前端部署
 
 前端正式部署主線使用 Cloudflare Pages GitHub integration。
 
@@ -83,13 +110,13 @@ npm run build
 
 除非 Cloudflare Pages GitHub integration 暫時不可用，否則不使用 Wrangler direct upload 作為正式前端部署主線。
 
-## 5. Firebase 設定
+## 6. Firebase 設定
 
 正式前端網域必須加入 Firebase Authentication 允許網域。
 
 部署後需在正式前端網域測試 Google 登入。
 
-## 6. CORS
+## 7. CORS
 
 Worker 的 `APP_CORS_ALLOWED_ORIGINS` 必須包含 Cloudflare Pages 前端 origin。
 
@@ -99,7 +126,7 @@ Worker 的 `APP_CORS_ALLOWED_ORIGINS` 必須包含 Cloudflare Pages 前端 origi
 https://personal-accounting-frontend.pages.dev
 ```
 
-## 7. 部署驗證
+## 8. 部署驗證
 
 部署後：
 
@@ -109,4 +136,5 @@ https://personal-accounting-frontend.pages.dev
 - 確認 `/api/auth/me` 成功。
 - 確認今日明細可載入。
 - 若使用測試帳號，建立一筆小額測試帳目。
+- 測試快速新增解析、修改 AI 分類後送出、再次輸入相似文字確認個人規則生效。
 - 確認首頁與歷史查看可更新。
