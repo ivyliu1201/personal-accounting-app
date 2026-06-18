@@ -68,6 +68,23 @@ python evaluate.py
 
 只有通過評估的 `transaction_classifier.pth` 才能部署。`training_data.csv` 仍是目前全域模型訓練資料來源；`ai_quick_add_feedback` 需經篩選後才可加入訓練資料。
 
+AI API 的模型檔目前包含主要分類器與 sparse embedding index。部署前需確認：
+
+- `python -m unittest test_train.py` 通過。
+- `python evaluate.py` 顯示 `errors=0` 且 `low_confidence=0`。
+- `evaluation_data.csv` 需覆蓋主要類別與常見口語泛化案例，例如水果、買菜、薯條、運動月費、寵物與收入入帳描述。
+- `transaction_classifier.pth` 是由最新 `training_data.csv` 重新訓練產生，不可部署舊模型檔。
+- 中文 HTTP response 正常，不能出現 Windows terminal 測試時才會看到的 `????` 或 mojibake。
+
+AI API 專案提供 `Dockerfile`。Cloud Run 部署範例：
+
+```powershell
+cd C:\ivy\code\ai-accounting-category-api
+gcloud run deploy accounting-category-ai-api --source . --region <region> --allow-unauthenticated
+```
+
+部署完成後，將 Cloud Run URL 設為 Worker 的 `AI_CATEGORY_SERVICE_URL`。正式 Worker 不可指向 `localhost` 或 `127.0.0.1`。
+
 ## 5. 前端部署
 
 前端正式部署主線使用 Cloudflare Pages GitHub integration。

@@ -1,6 +1,6 @@
 {
-  // Deprecated: Worker + D1 route is no longer the active project path.
-  // Keep this file only for historical reference. Do not deploy from this config.
+  // Active Worker API for the Cloudflare Worker + Supabase architecture.
+  // Runtime secrets are configured in Cloudflare and documented in docs/v2/06-env.md.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "personal-accounting-worker",
   "main": "src/index.ts",

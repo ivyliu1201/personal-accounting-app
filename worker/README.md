@@ -29,10 +29,13 @@ cd worker
 wrangler secret put FIREBASE_PROJECT_ID
 wrangler secret put SUPABASE_URL
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+wrangler secret put APP_CORS_ALLOWED_ORIGINS
+wrangler secret put AI_CATEGORY_SERVICE_URL
+wrangler secret put AI_CATEGORY_SERVICE_TOKEN
 npm run deploy
 ```
 
-部署後把前端 `VITE_API_BASE_URL` 指到 Worker URL。
+部署前先確認 `AI_CATEGORY_SERVICE_URL` 指向已部署且通過評估的 AI API，正式環境不可使用 `localhost` 或 `127.0.0.1`。部署後把前端 `VITE_API_BASE_URL` 指到 Worker URL。
 
 ## AI Quick Add Feedback
 
