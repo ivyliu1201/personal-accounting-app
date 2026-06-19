@@ -80,10 +80,19 @@ AI API 專案提供 `Dockerfile`。Cloud Run 部署範例：
 
 ```powershell
 cd C:\ivy\code\ai-accounting-category-api
-gcloud run deploy accounting-category-ai-api --source . --region <region> --allow-unauthenticated
+gcloud run deploy accounting-category-ai-api --source . --region asia-east1 --allow-unauthenticated --min-instances 0 --max-instances 2 --memory 1Gi --cpu 1
 ```
 
 部署完成後，將 Cloud Run URL 設為 Worker 的 `AI_CATEGORY_SERVICE_URL`。正式 Worker 不可指向 `localhost` 或 `127.0.0.1`。
+
+成本保護規則：
+
+- Cloud Run `min-instances` 必須為 `0`，避免無流量時保溫計費。
+- Cloud Run `max-instances` 建議維持 `2`，避免異常流量造成成本暴衝。
+- AI 訓練由本機手動執行，不在 Cloud Run 內排程訓練。
+- 每週重新訓練與重新部署後，需清理舊 Cloud Run revision 或確認舊 revision 已無流量。
+- Artifact Registry 需設定 cleanup policy，只保留必要的新版本，避免 PyTorch image 長期累積 storage 費。
+- Google Cloud Billing 應設定 budget alert，建議 `US$3`，通知門檻 `50%`、`90%`、`100%`。
 
 ## 5. 前端部署
 
