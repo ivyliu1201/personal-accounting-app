@@ -824,7 +824,7 @@ const CategorySelect = defineComponent({
         'div',
         {
           ref: root,
-          class: 'category-select',
+          class: ['category-select', { open: open.value }],
           onFocusout: handleFocusout,
           onKeydown: handleKeydown
         },

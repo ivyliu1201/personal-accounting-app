@@ -576,7 +576,7 @@ h1::after,
 /* ----- entry list ----- */
 .entry-list {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   gap: 12px;
   min-width: 0;
@@ -614,6 +614,12 @@ h1::after,
 .quick-add-suggestion-card:focus-within,
 .modal-form label:focus-within {
   z-index: 90;
+}
+
+.entry-card:has(.category-select.open),
+.quick-add-suggestion-card:has(.category-select.open),
+.modal-form label:has(.category-select.open) {
+  z-index: 120;
 }
 
 .entry-card > :nth-child(1) { grid-area: type; }
@@ -715,6 +721,10 @@ h1::after,
   position: relative;
   width: 100%;
   min-width: 0;
+}
+
+.category-select.open {
+  z-index: 130;
 }
 
 .category-select-trigger {
@@ -1806,7 +1816,7 @@ td[colspan] {
 
 .modal-form {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   gap: 12px;
 }
@@ -1852,7 +1862,7 @@ td[colspan] {
 .quick-add-preview,
 .quick-add-unparsed {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   gap: 10px;
   border: 1.5px solid var(--line);
@@ -2392,7 +2402,7 @@ td[colspan] {
     gap: 8px;
     width: 100%;
     overflow: visible;
-    contain: layout;
+    contain: none;
   }
 
   .entry-card:hover {
