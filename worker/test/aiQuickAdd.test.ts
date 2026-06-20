@@ -544,6 +544,49 @@ test('parseQuickAddRequest applies previous successful expense note correction f
   assert.equal(response.suggestions[0].needsReview, false);
 });
 
+test('parseQuickAddRequest keeps confident model category before stale successful transaction note', async () => {
+  const response = await parseQuickAddRequest({
+    env: {
+      AI_CATEGORY_SERVICE_URL: 'https://ai.example.test'
+    },
+    user: { userId: 'firebase-user-1', email: 'user@example.test' },
+    body: { text: '哈密瓜100' },
+    today: '2026-06-20',
+    listVisibleCategoryNames: async (type) => type === 'EXPENSE' ? ['飲食', '家居'] : ['薪資'],
+    loadPersonalRules: async () => [
+      {
+        itemText: '哈密瓜',
+        sourceText: '哈密瓜100',
+        type: 'EXPENSE',
+        categoryName: '家居',
+        source: 'transaction'
+      }
+    ],
+    callAiService: async () => ({
+      items: [
+        {
+          sourceText: '哈密瓜100',
+          itemText: '哈密瓜',
+          amount: 100,
+          modelType: 'EXPENSE',
+          modelCategory: '飲食',
+          modelLabel: 'expense::飲食',
+          confidence: 1,
+          needsReview: false
+        }
+      ],
+      unparsedItems: []
+    }),
+    createSuggestionId: () => 'suggestion-1'
+  });
+
+  assert.equal(response.suggestions[0].type, 'EXPENSE');
+  assert.equal(response.suggestions[0].categoryName, '飲食');
+  assert.equal(response.suggestions[0].mappedCategoryName, '飲食');
+  assert.equal(response.suggestions[0].mappingSource, 'exact_match');
+  assert.equal(response.suggestions[0].needsReview, false);
+});
+
 test('parseQuickAddRequest prefers visible category keyword in source text over wrong model category', async () => {
   const response = await parseQuickAddRequest({
     env: {

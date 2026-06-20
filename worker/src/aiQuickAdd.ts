@@ -59,6 +59,7 @@ export interface PersonalQuickAddRule {
   sourceText: string | null;
   type: TransactionType;
   categoryName: string;
+  source: 'feedback' | 'transaction' | 'bootstrap';
 }
 
 export interface QuickAddSuggestion {
@@ -128,8 +129,8 @@ const DEFAULT_GLOBAL_MAPPINGS: CategoryMappingRow[] = [
 ];
 
 const BOOTSTRAP_PERSONAL_RULES: PersonalQuickAddRule[] = [
-  { itemText: '吃飯', sourceText: '吃飯', type: 'EXPENSE', categoryName: '飲食' },
-  { itemText: '搭車', sourceText: '搭車', type: 'EXPENSE', categoryName: '交通' }
+  { itemText: '吃飯', sourceText: '吃飯', type: 'EXPENSE', categoryName: '飲食', source: 'bootstrap' },
+  { itemText: '搭車', sourceText: '搭車', type: 'EXPENSE', categoryName: '交通', source: 'bootstrap' }
 ];
 
 /**
@@ -318,7 +319,11 @@ export function buildQuickAddParseResponse(request: BuildQuickAddParseResponseRe
       suggestedItemText,
       request.visibleCategoriesByType[item.modelType]
     );
-    const finalMapping = personalRule
+    const shouldApplyPersonalRule = personalRule
+      && (personalRule.source !== 'transaction'
+        || item.needsReview
+        || mappedCategory.mappingSource === 'suggested_custom_category');
+    const finalMapping = shouldApplyPersonalRule
       ? {
           type: personalRule.type,
           categoryName: personalRule.categoryName,
@@ -338,7 +343,7 @@ export function buildQuickAddParseResponse(request: BuildQuickAddParseResponseRe
       amount: item.amount,
       categoryName: finalMapping.categoryName,
       customCategoryName: finalMapping.customCategoryName,
-      needsReview: personalRule || categoryKeywordMapping ? false : item.needsReview,
+      needsReview: shouldApplyPersonalRule || categoryKeywordMapping ? false : item.needsReview,
       confidence: item.confidence,
       modelLabel: item.modelLabel,
       modelType: item.modelType,
@@ -448,7 +453,8 @@ function toPersonalRule(row: unknown): PersonalQuickAddRule | null {
     itemText,
     sourceText,
     type,
-    categoryName: categoryName.trim()
+    categoryName: categoryName.trim(),
+    source: 'feedback'
   };
 }
 
@@ -471,7 +477,8 @@ function toTransactionPersonalRule(row: unknown): PersonalQuickAddRule | null {
     itemText: note.trim(),
     sourceText: note.trim(),
     type,
-    categoryName: categoryName.trim()
+    categoryName: categoryName.trim(),
+    source: 'transaction'
   };
 }
 
