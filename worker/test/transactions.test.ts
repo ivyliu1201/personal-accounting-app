@@ -51,7 +51,7 @@ interface FakeSupabaseTransactionRow extends FakeTransactionRow {
 class FakeSupabaseDatabase {
   readonly categories: FakeCategoryRow[];
   transactions: FakeTransactionRow[] = [];
-  readonly aiFeedbackRows: unknown[] = [];
+  aiFeedbackRows: Array<Record<string, unknown>> = [];
 
   constructor(categories: FakeCategoryRow[]) {
     this.categories = categories;
@@ -205,7 +205,7 @@ class FakeSupabaseQuery {
       return null;
     }
     if (this.tableName === 'ai_quick_add_feedback') {
-      this.database.aiFeedbackRows.push(this.insertPayload);
+      this.database.aiFeedbackRows.push(this.insertPayload as Record<string, unknown>);
       return null;
     }
     throw new Error(`Unsupported table: ${this.tableName}`);
@@ -221,11 +221,17 @@ class FakeSupabaseQuery {
   }
 
   private executeDelete() {
-    if (this.tableName !== 'accounting_transactions') {
-      throw new Error(`Unsupported delete table: ${this.tableName}`);
+    if (this.tableName === 'ai_quick_add_feedback') {
+      const rowsToDelete = new Set(this.filterRows(this.database.aiFeedbackRows));
+      this.database.aiFeedbackRows = this.database.aiFeedbackRows.filter((row) => !rowsToDelete.has(row));
+      return;
     }
-    const rowsToDelete = new Set(this.filterRows(this.database.transactions));
-    this.database.transactions = this.database.transactions.filter((row) => !rowsToDelete.has(row));
+    if (this.tableName === 'accounting_transactions') {
+      const rowsToDelete = new Set(this.filterRows(this.database.transactions));
+      this.database.transactions = this.database.transactions.filter((row) => !rowsToDelete.has(row));
+      return;
+    }
+    throw new Error(`Unsupported delete table: ${this.tableName}`);
   }
 
   private filterRows<T extends Record<string, unknown>>(rows: T[]): T[] {
@@ -831,6 +837,31 @@ test('deleteTransaction removes current user row', async () => {
   await deleteTransaction(database as unknown as SupabaseClient, user, 'delete-me');
 
   assert.deepEqual(database.transactions.map((transaction) => transaction.id), ['keep-me']);
+});
+
+test('deleteTransaction removes quick add feedback for deleted transaction', async () => {
+  const database = new FakeSupabaseDatabase(createDefaultCategories());
+  database.transactions.push(
+    createFakeTransaction('delete-me', 'firebase-user-1', 'EXPENSE', '2026-04-27', 80, 'default-food', 'delete'),
+    createFakeTransaction('keep-me', 'firebase-user-1', 'EXPENSE', '2026-04-28', 90, 'default-food', 'keep')
+  );
+  database.aiFeedbackRows.push(
+    {
+      id: 'feedback-delete',
+      transaction_id: 'delete-me',
+      user_id: 'firebase-user-1'
+    },
+    {
+      id: 'feedback-keep',
+      transaction_id: 'keep-me',
+      user_id: 'firebase-user-1'
+    }
+  );
+
+  await deleteTransaction(database as unknown as SupabaseClient, user, 'delete-me');
+
+  assert.deepEqual(database.transactions.map((transaction) => transaction.id), ['keep-me']);
+  assert.deepEqual(database.aiFeedbackRows.map((row) => row.id), ['feedback-keep']);
 });
 
 function createDefaultCategories(): FakeCategoryRow[] {

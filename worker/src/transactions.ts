@@ -277,6 +277,15 @@ export async function deleteTransaction(
   id: string
 ): Promise<void> {
   await getRequiredTransaction(supabase, user, id);
+  const { error: feedbackDeleteError } = await supabase
+    .from('ai_quick_add_feedback')
+    .delete()
+    .eq('transaction_id', id)
+    .eq('user_id', user.userId);
+  if (feedbackDeleteError) {
+    throw feedbackDeleteError;
+  }
+
   const { error } = await supabase
     .from('accounting_transactions')
     .delete()
