@@ -368,7 +368,7 @@ export function buildQuickAddParseResponse(request: BuildQuickAddParseResponseRe
     const categoryKeywordMapping = findCategoryKeywordMapping(
       item,
       suggestedItemText,
-      request.visibleCategoriesByType[item.modelType]
+      request.visibleCategoriesByType
     );
     const shouldApplyPersonalRule = personalRule
       && (personalRule.source !== 'transaction'
@@ -565,23 +565,35 @@ function findPersonalRule(
 function findCategoryKeywordMapping(
   item: AiCategoryServiceItem,
   suggestedItemText: string,
-  visibleCategories: string[]
+  visibleCategoriesByType: Record<TransactionType, string[]>
 ): ResolvedMappedCategory | null {
   const itemTexts = [
     normalizeRuleText(item.sourceText),
     normalizeRuleText(item.itemText),
     normalizeRuleText(suggestedItemText)
   ].filter((text) => text !== '');
-  const categoryName = visibleCategories.find((category) => {
-    const normalizedCategory = normalizeRuleText(category);
-    return normalizedCategory !== '' && itemTexts.some((text) => text.includes(normalizedCategory));
-  });
-  if (!categoryName) {
+  const matches = (['EXPENSE', 'INCOME'] as const).flatMap((type) => visibleCategoriesByType[type]
+    .filter((categoryName) => {
+      const normalizedCategory = normalizeRuleText(categoryName);
+      return normalizedCategory !== '' && itemTexts.some((text) => text.includes(normalizedCategory));
+    })
+    .map((categoryName) => ({ type, categoryName })));
+  const modelTypeMatch = matches.find((match) => match.type === item.modelType);
+  if (modelTypeMatch) {
+    return {
+      type: modelTypeMatch.type,
+      categoryName: modelTypeMatch.categoryName,
+      customCategoryName: null,
+      mappingSource: 'exact_match'
+    };
+  }
+
+  if (matches.length !== 1) {
     return null;
   }
   return {
-    type: item.modelType,
-    categoryName,
+    type: matches[0].type,
+    categoryName: matches[0].categoryName,
     customCategoryName: null,
     mappingSource: 'exact_match'
   };

@@ -672,6 +672,74 @@ test('parseQuickAddRequest prefers visible category keyword in source text over 
   assert.equal(response.suggestions[0].needsReview, false);
 });
 
+test('parseQuickAddRequest matches unique income category keyword before wrong model expense type', async () => {
+  const response = await parseQuickAddRequest({
+    env: {
+      AI_CATEGORY_SERVICE_URL: 'https://ai.example.test'
+    },
+    user: { userId: 'firebase-user-1', email: 'user@example.test' },
+    body: { text: '薪資50000' },
+    today: '2026-06-21',
+    listVisibleCategoryNames: async (type) => type === 'EXPENSE' ? ['家居', '飲食'] : ['薪資', '投資'],
+    callAiService: async () => ({
+      items: [
+        {
+          sourceText: '薪資50000',
+          itemText: '薪資',
+          amount: 50000,
+          modelType: 'EXPENSE',
+          modelCategory: '家居',
+          modelLabel: 'expense::家居',
+          confidence: 0.62,
+          needsReview: true
+        }
+      ],
+      unparsedItems: []
+    }),
+    createSuggestionId: () => 'suggestion-1'
+  });
+
+  assert.equal(response.suggestions[0].type, 'INCOME');
+  assert.equal(response.suggestions[0].categoryName, '薪資');
+  assert.equal(response.suggestions[0].mappedCategoryName, '薪資');
+  assert.equal(response.suggestions[0].mappingSource, 'exact_match');
+  assert.equal(response.suggestions[0].needsReview, false);
+});
+
+test('parseQuickAddRequest does not switch type for category keyword shared by income and expense', async () => {
+  const response = await parseQuickAddRequest({
+    env: {
+      AI_CATEGORY_SERVICE_URL: 'https://ai.example.test'
+    },
+    user: { userId: 'firebase-user-1', email: 'user@example.test' },
+    body: { text: '投資1000' },
+    today: '2026-06-21',
+    listVisibleCategoryNames: async (type) => type === 'EXPENSE' ? ['投資', '家居'] : ['投資', '薪資'],
+    callAiService: async () => ({
+      items: [
+        {
+          sourceText: '投資1000',
+          itemText: '投資',
+          amount: 1000,
+          modelType: 'EXPENSE',
+          modelCategory: '家居',
+          modelLabel: 'expense::家居',
+          confidence: 0.62,
+          needsReview: true
+        }
+      ],
+      unparsedItems: []
+    }),
+    createSuggestionId: () => 'suggestion-1'
+  });
+
+  assert.equal(response.suggestions[0].type, 'EXPENSE');
+  assert.equal(response.suggestions[0].categoryName, '投資');
+  assert.equal(response.suggestions[0].mappedCategoryName, '投資');
+  assert.equal(response.suggestions[0].mappingSource, 'exact_match');
+  assert.equal(response.suggestions[0].needsReview, false);
+});
+
 test('parseQuickAddRequest rejects missing AI service URL', async () => {
   await assert.rejects(
     () => parseQuickAddRequest({
