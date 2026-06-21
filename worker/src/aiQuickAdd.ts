@@ -122,7 +122,7 @@ export class AiCategoryServiceLoadingError extends Error {
   }
 }
 
-const AI_CATEGORY_SERVICE_TIMEOUT_MILLIS = 8_000;
+const AI_CATEGORY_SERVICE_TIMEOUT_MILLIS = 5_000;
 const AI_CATEGORY_SERVICE_MAX_ATTEMPTS = 2;
 
 export const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
