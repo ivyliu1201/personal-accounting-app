@@ -742,6 +742,7 @@ const TREND_CHART_RIGHT = 346;
 const TREND_CHART_TOP = 26;
 const TREND_CHART_BOTTOM = 170;
 const TREND_TICK_STEP = 4000;
+const QUICK_ADD_SERVICE_LOADING_MESSAGE = '服務載入中，請再試一次!';
 const trendAxisPoints = `${TREND_CHART_LEFT},${TREND_CHART_TOP} ${TREND_CHART_LEFT},${TREND_CHART_BOTTOM} ${TREND_CHART_RIGHT},${TREND_CHART_BOTTOM}`;
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -1340,7 +1341,7 @@ async function parseQuickAdd() {
       body: JSON.stringify({ text: quickAddText.value })
     });
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '快速新增解析失敗'));
+      throw new Error(await getQuickAddParseErrorMessage(response));
     }
     const data = await response.json() as QuickAddParseResponse;
     quickAddSuggestions.value = data.suggestions;
@@ -1883,6 +1884,28 @@ async function getErrorMessage(response: Response, fallbackMessage: string) {
     return fallbackMessage;
   }
   return text || fallbackMessage;
+}
+
+async function getQuickAddParseErrorMessage(response: Response) {
+  if (response.status === 503) {
+    return await readJsonErrorMessage(response, QUICK_ADD_SERVICE_LOADING_MESSAGE);
+  }
+  return getErrorMessage(response, '快速新增解析失敗');
+}
+
+async function readJsonErrorMessage(response: Response, fallbackMessage: string) {
+  const text = await response.text();
+  if (!text) {
+    return fallbackMessage;
+  }
+  try {
+    const data = JSON.parse(text) as { message?: unknown };
+    return typeof data.message === 'string' && data.message.trim()
+      ? data.message
+      : fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
 }
 
 function mergeCategories(defaultCategories: string[], loadedCategories: string[]) {

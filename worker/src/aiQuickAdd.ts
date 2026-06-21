@@ -113,6 +113,17 @@ export interface ParseQuickAddRequestDependencies {
 }
 
 export type Fetcher = typeof fetch;
+export const AI_CATEGORY_SERVICE_LOADING_MESSAGE = '服務載入中，請再試一次!';
+
+export class AiCategoryServiceLoadingError extends Error {
+  constructor() {
+    super(AI_CATEGORY_SERVICE_LOADING_MESSAGE);
+    this.name = 'AiCategoryServiceLoadingError';
+  }
+}
+
+const AI_CATEGORY_SERVICE_TIMEOUT_MILLIS = 8_000;
+const AI_CATEGORY_SERVICE_MAX_ATTEMPTS = 2;
 
 export const CUSTOM_CATEGORY_VALUE = '__CUSTOM__';
 
@@ -198,20 +209,60 @@ export async function callAiCategoryService(
   text: string,
   fetcher: Fetcher = fetch
 ): Promise<AiCategoryServiceResponse> {
-  const response = await fetcher(`${serviceUrl.replace(/\/$/, '')}/parse`, {
+  const url = `${serviceUrl.replace(/\/$/, '')}/parse`;
+  const requestInit: RequestInit = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(serviceToken ? { Authorization: `Bearer ${serviceToken}` } : {})
     },
     body: JSON.stringify({ text })
-  });
+  };
 
-  if (!response.ok) {
-    throw new Error('AI service request failed');
+  for (let attempt = 1; attempt <= AI_CATEGORY_SERVICE_MAX_ATTEMPTS; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(url, requestInit, fetcher);
+    } catch (error) {
+      if (attempt >= AI_CATEGORY_SERVICE_MAX_ATTEMPTS) {
+        throw new AiCategoryServiceLoadingError();
+      }
+      continue;
+    }
+
+    if (response.ok) {
+      return response.json() as Promise<AiCategoryServiceResponse>;
+    }
+    if (!isRetryableAiServiceStatus(response.status)) {
+      throw new Error('AI service request failed');
+    }
+    if (attempt >= AI_CATEGORY_SERVICE_MAX_ATTEMPTS) {
+      throw new AiCategoryServiceLoadingError();
+    }
   }
 
-  return response.json() as Promise<AiCategoryServiceResponse>;
+  throw new AiCategoryServiceLoadingError();
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  fetcher: Fetcher
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AI_CATEGORY_SERVICE_TIMEOUT_MILLIS);
+  try {
+    return await fetcher(url, {
+      ...init,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function isRetryableAiServiceStatus(status: number): boolean {
+  return status >= 500;
 }
 
 /**

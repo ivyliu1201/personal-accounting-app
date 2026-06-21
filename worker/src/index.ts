@@ -1,5 +1,10 @@
 import { AuthError, authenticateFirebaseRequest, type WorkerEnv } from './auth';
-import { formatQuickAddAppDate, parseQuickAddRequest } from './aiQuickAdd';
+import {
+  AI_CATEGORY_SERVICE_LOADING_MESSAGE,
+  AiCategoryServiceLoadingError,
+  formatQuickAddAppDate,
+  parseQuickAddRequest
+} from './aiQuickAdd';
 import { listCategoryOptions, parseTransactionType } from './categories';
 import { getSupabaseClient } from './db';
 import {
@@ -100,6 +105,9 @@ export default {
         }
         if (error instanceof AuthError) {
           return jsonResponse<ErrorResponse>({ message: error.message }, error.status, corsOrigin);
+        }
+        if (error instanceof AiCategoryServiceLoadingError) {
+          return jsonResponse<ErrorResponse>({ message: AI_CATEGORY_SERVICE_LOADING_MESSAGE }, 503, corsOrigin);
         }
         return jsonResponse<ErrorResponse>({ message: 'Quick add parsing failed' }, 500, corsOrigin);
       }

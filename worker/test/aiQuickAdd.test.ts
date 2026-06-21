@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  AiCategoryServiceLoadingError,
   buildQuickAddParseResponse,
   callAiCategoryService,
   parseTransactionDateFromText,
@@ -305,6 +306,56 @@ test('callAiCategoryService sends text to configured service', async () => {
   assert.equal(calls[0].url, 'https://ai.example.test/parse');
   assert.equal((calls[0].init.headers as Record<string, string>).Authorization, 'Bearer secret-token');
   assert.equal(calls[0].init.body, JSON.stringify({ text: '早餐100' }));
+});
+
+test('callAiCategoryService retries once when the AI service is loading', async () => {
+  let calls = 0;
+  const response = await callAiCategoryService(
+    'https://ai.example.test',
+    undefined,
+    '早餐100',
+    async () => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response('', { status: 503 });
+      }
+      return new Response(JSON.stringify({ items: [], unparsedItems: [] }), { status: 200 });
+    }
+  );
+
+  assert.equal(calls, 2);
+  assert.deepEqual(response, { items: [], unparsedItems: [] });
+});
+
+test('callAiCategoryService does not retry non loading AI service errors', async () => {
+  let calls = 0;
+  await assert.rejects(
+    () => callAiCategoryService(
+      'https://ai.example.test',
+      undefined,
+      '早餐100',
+      async () => {
+        calls += 1;
+        return new Response('', { status: 400 });
+      }
+    ),
+    (error: unknown) => error instanceof Error && error.message === 'AI service request failed'
+  );
+
+  assert.equal(calls, 1);
+});
+
+test('callAiCategoryService reports loading message when retry still fails', async () => {
+  await assert.rejects(
+    () => callAiCategoryService(
+      'https://ai.example.test',
+      undefined,
+      '早餐100',
+      async () => new Response('', { status: 503 })
+    ),
+    (error: unknown) => error instanceof AiCategoryServiceLoadingError
+      && error.message === '服務載入中，請再試一次!'
+  );
 });
 
 test('parseQuickAddRequest builds suggestions from AI service response', async () => {
